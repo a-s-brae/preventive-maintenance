@@ -1,5 +1,7 @@
 import Link from "next/link";
+import type { Priority, WorkOrderStatus } from "@prisma/client";
 import type { DueInfo, DueStatus } from "@/lib/schedule";
+import { PRIORITY_LABEL, STATUS_LABEL as WO_STATUS_LABEL } from "@/lib/work-orders";
 import { formatDate, formatNumber } from "@/lib/forms";
 
 const STATUS_STYLE: Record<DueStatus, string> = {
@@ -21,6 +23,59 @@ export function StatusBadge({ status }: { status: DueStatus }) {
       {STATUS_LABEL[status]}
     </span>
   );
+}
+
+const WO_STATUS_STYLE: Record<WorkOrderStatus, string> = {
+  OPEN: "bg-sky-100 text-sky-800 ring-sky-200",
+  IN_PROGRESS: "bg-violet-100 text-violet-800 ring-violet-200",
+  ON_HOLD: "bg-slate-200 text-slate-700 ring-slate-300",
+  COMPLETE: "bg-emerald-100 text-emerald-800 ring-emerald-200",
+};
+
+export function WoStatusBadge({ status }: { status: WorkOrderStatus }) {
+  return (
+    <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset ${WO_STATUS_STYLE[status]}`}>
+      {WO_STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+const PRIORITY_STYLE: Record<Priority, string> = {
+  NONE: "text-slate-400",
+  LOW: "text-slate-600",
+  MEDIUM: "text-amber-700",
+  HIGH: "text-red-700 font-semibold",
+};
+
+export function PriorityText({ priority }: { priority: Priority }) {
+  if (priority === "NONE") return <span className="text-slate-400">—</span>;
+  return <span className={`text-xs uppercase tracking-wide ${PRIORITY_STYLE[priority]}`}>{PRIORITY_LABEL[priority]}</span>;
+}
+
+/** A work order's due point: "Mar 3, 2026 (in 4 days)" and/or "at 1,250 hours". */
+export function WoDueText({
+  dueDate,
+  dueMeter,
+  daysLeft,
+  meterLeft = null,
+  meterUnit,
+}: {
+  dueDate: Date | null;
+  dueMeter: number | null;
+  daysLeft: number | null;
+  meterLeft?: number | null;
+  meterUnit: string | null;
+}) {
+  const parts: string[] = [];
+  if (dueDate && daysLeft != null) {
+    const rel = daysLeft === 0 ? "today" : daysLeft > 0 ? `in ${daysLeft} day${daysLeft === 1 ? "" : "s"}` : `${-daysLeft} day${daysLeft === -1 ? "" : "s"} late`;
+    parts.push(`${formatDate(dueDate)} (${rel})`);
+  }
+  if (dueMeter != null) {
+    const left = meterLeft == null ? "" : meterLeft > 0 ? ` (${formatNumber(meterLeft)} left)` : ` (${formatNumber(-meterLeft)} over)`;
+    parts.push(`at ${formatNumber(dueMeter)} ${meterUnit ?? ""}`.trim() + left);
+  }
+  return <span>{parts.join(" · ") || "No due date"}</span>;
 }
 
 /** "Mar 3, 2026 (in 4 days)" and/or "1,250 hours (40 left)". */

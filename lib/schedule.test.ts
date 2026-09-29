@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addInterval, compareDue, computeDue, describeInterval, type ScheduleInput } from "./schedule";
+import { addInterval, compareDue, computeDue, describeInterval, fixedOccurrence, nextFixedCycle, type ScheduleInput } from "./schedule";
 
 const d = (s: string) => new Date(`${s}T12:00:00Z`);
 
@@ -7,7 +7,9 @@ const base: ScheduleInput = {
   calendarEvery: null,
   calendarUnit: null,
   usageEvery: null,
+  scheduleBasis: "COMPLETION",
   startDate: d("2026-01-01"),
+  fixedCycle: 0,
   startMeter: null,
   lastDoneAt: null,
   lastDoneMeter: null,
@@ -32,9 +34,9 @@ describe("addInterval", () => {
 });
 
 describe("computeDue — calendar", () => {
-  const monthly = { ...base, calendarEvery: 1, calendarUnit: "MONTH" as const };
+  const monthly = { ...base, calendarEvery: 1, calendarUnit: "MONTH" as const, startDate: d("2026-02-01") };
 
-  it("uses start date until first completion", () => {
+  it("is first due on the start date", () => {
     const r = computeDue(monthly, null, d("2026-01-10"));
     expect(r.nextDueAt).toEqual(d("2026-02-01"));
     expect(r.status).toBe("OK");
@@ -94,7 +96,7 @@ describe("computeDue — usage", () => {
 });
 
 describe("computeDue — calendar + usage", () => {
-  const both = { ...base, calendarEvery: 6, calendarUnit: "MONTH" as const, usageEvery: 500, startMeter: 0 };
+  const both = { ...base, calendarEvery: 6, calendarUnit: "MONTH" as const, startDate: d("2026-07-01"), usageEvery: 500, startMeter: 0 };
 
   it("is overdue when usage is hit before the date", () => {
     expect(computeDue(both, 510, d("2026-02-01")).status).toBe("OVERDUE");
@@ -105,6 +107,31 @@ describe("computeDue — calendar + usage", () => {
   });
 });
 
+describe("fixed schedules", () => {
+  const fixed = { ...base, calendarEvery: 1, calendarUnit: "MONTH" as const, scheduleBasis: "FIXED" as const, startDate: d("2026-01-31") };
+
+  it("stays on the calendar regardless of when it was done", () => {
+    expect(computeDue({ ...fixed, fixedCycle: 2, lastDoneAt: d("2026-03-10") }, null, d("2026-03-10")).nextDueAt).toEqual(d("2026-03-31"));
+  });
+
+  it("doesn't drift at month end", () => {
+    expect(fixedOccurrence(fixed.startDate, 1, "MONTH", 1)).toEqual(d("2026-02-28"));
+    expect(fixedOccurrence(fixed.startDate, 1, "MONTH", 2)).toEqual(d("2026-03-31"));
+  });
+
+  it("moves to the next occurrence after completion", () => {
+    // Feb 28 occurrence (cycle 1) done early on Feb 20 -> next is Mar 31.
+    expect(nextFixedCycle(fixed, 1, d("2026-02-20"))).toBe(2);
+    // Done on the due date itself -> still the following one.
+    expect(nextFixedCycle(fixed, 1, d("2026-02-28"))).toBe(2);
+  });
+
+  it("skips occurrences already past when done late", () => {
+    // Feb 28 occurrence done on Apr 2 -> Mar 31 is past, next is Apr 30.
+    expect(nextFixedCycle(fixed, 1, d("2026-04-02"))).toBe(3);
+  });
+});
+
 it("reports tasks with no interval", () => {
   expect(computeDue(base, null).status).toBe("NO_SCHEDULE");
 });
@@ -112,9 +139,9 @@ it("reports tasks with no interval", () => {
 it("sorts most urgent first", () => {
   const monthly = { ...base, calendarEvery: 1, calendarUnit: "MONTH" as const };
   const now = d("2026-01-28");
-  const soon = computeDue(monthly, null, now);
-  const overdue = computeDue({ ...monthly, startDate: d("2025-11-01") }, null, now);
-  const ok = computeDue({ ...monthly, startDate: d("2026-01-27") }, null, now);
+  const soon = computeDue({ ...monthly, startDate: d("2026-02-01") }, null, now);
+  const overdue = computeDue({ ...monthly, startDate: d("2025-12-01") }, null, now);
+  const ok = computeDue({ ...monthly, startDate: d("2026-02-27") }, null, now);
   expect([ok, soon, overdue].sort(compareDue)).toEqual([overdue, soon, ok]);
 });
 
@@ -122,5 +149,8 @@ it("describes intervals", () => {
   expect(describeInterval({ calendarEvery: 1, calendarUnit: "WEEK", usageEvery: null }, null)).toBe("every week");
   expect(describeInterval({ calendarEvery: 3, calendarUnit: "MONTH", usageEvery: 500 }, "hours")).toBe(
     "every 3 months or every 500 hours",
+  );
+  expect(describeInterval({ calendarEvery: 1, calendarUnit: "MONTH", usageEvery: null, scheduleBasis: "FIXED" }, null)).toBe(
+    "every month (fixed)",
   );
 });

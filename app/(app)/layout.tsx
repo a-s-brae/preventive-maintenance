@@ -3,6 +3,9 @@ import { requireUser, signOut } from "@/auth";
 
 const NAV = [
   { href: "/", label: "Dashboard" },
+  { href: "/work-orders", label: "Work orders" },
+  { href: "/work-orders/calendar", label: "Calendar" },
+  { href: "/pm", label: "PM schedules" },
   { href: "/assets", label: "Assets" },
   { href: "/history", label: "History" },
 ];
@@ -12,11 +15,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <>
       <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-6 px-4 pt-3 lg:py-3">
           <Link href="/" className="font-semibold">
             PM System
           </Link>
-          <nav className="flex gap-4 text-sm">
+          {/* Its own scrollable row below the brand on small screens; inline on large ones. */}
+          <nav className="order-last -mx-4 flex w-[calc(100%+2rem)] gap-5 overflow-x-auto px-4 py-2.5 text-sm whitespace-nowrap lg:order-none lg:mx-0 lg:w-auto lg:overflow-visible lg:p-0">
             {NAV.map((n) => (
               <Link key={n.href} href={n.href} className="text-slate-600 hover:text-slate-900">
                 {n.label}

@@ -1,27 +1,30 @@
 import Link from "next/link";
+import { requireUser } from "@/auth";
 import { db } from "@/lib/db";
 import { loadSampleAssets } from "@/lib/actions";
-import { getScheduledTasks } from "@/lib/queries";
-import { describeInterval } from "@/lib/schedule";
-import { ButtonLink, Card, DueText, Empty, PageHeader, StatusBadge } from "@/components/ui";
+import { getOpenWorkOrders } from "@/lib/queries";
+import { OpenWorkOrderList } from "@/components/work-order-table";
+import { ButtonLink, Card, PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function Dashboard() {
-  const [rows, assetCount] = await Promise.all([getScheduledTasks(), db.asset.count()]);
-  const count = (s: string) => rows.filter((r) => r.due.status === s).length;
-  const actionable = rows.filter((r) => r.due.status === "OVERDUE" || r.due.status === "DUE_SOON");
+  const user = await requireUser();
+  const [open, assetCount] = await Promise.all([getOpenWorkOrders(), db.asset.count()]);
+  const attention = open.filter((wo) => wo.due.status === "OVERDUE" || wo.due.status === "DUE_SOON");
+  const mine = open.filter((wo) => wo.assignedToId === user.id);
 
   return (
     <>
       <PageHeader title="Dashboard">
-        <ButtonLink href="/assets/new">Add asset</ButtonLink>
+        <ButtonLink href="/work-orders/new">New work order</ButtonLink>
       </PageHeader>
 
-      <div className="mb-6 grid grid-cols-3 gap-4">
-        <Stat label="Overdue" value={count("OVERDUE")} tone="text-red-700" />
-        <Stat label="Due soon" value={count("DUE_SOON")} tone="text-amber-700" />
-        <Stat label="On schedule" value={count("OK")} tone="text-emerald-700" />
+      <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+        <Stat label="Overdue" value={open.filter((wo) => wo.due.status === "OVERDUE").length} tone="text-red-700" href="/work-orders" />
+        <Stat label="Due this week" value={open.filter((wo) => wo.due.status === "DUE_SOON").length} tone="text-amber-700" href="/work-orders" />
+        <Stat label="In progress" value={open.filter((wo) => wo.status === "IN_PROGRESS").length} tone="text-violet-700" href="/work-orders" />
+        <Stat label="Assigned to me" value={mine.length} tone="text-sky-700" href="/work-orders?view=mine" />
       </div>
 
       {assetCount === 0 ? (
@@ -41,84 +44,33 @@ export default async function Dashboard() {
           </div>
         </div>
       ) : (
-        <Card title="Needs attention">
-          {actionable.length === 0 ? (
-            <Empty>{rows.length === 0 ? "No PM tasks yet — open an asset and add one." : "Nothing is due. Nice."}</Empty>
-          ) : (
-            <>
-              <ul className="divide-y divide-slate-100 sm:hidden">
-                {actionable.map(({ task, due }) => (
-                  <li key={task.id} className="py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="font-medium">{task.title}</div>
-                        <Link href={`/assets/${task.asset.id}`} className="link text-sm">
-                          {task.asset.name}
-                        </Link>
-                      </div>
-                      <StatusBadge status={due.status} />
-                    </div>
-                    <div className="mt-1 text-sm text-slate-600">
-                      <DueText due={due} meterUnit={task.asset.meterUnit} />
-                    </div>
-                    <Link href={`/tasks/${task.id}/complete`} className="btn-secondary mt-2 w-full">
-                      Complete
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-              <div className="hidden overflow-x-auto sm:block">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Status</th>
-                      <th>Asset</th>
-                      <th>Task</th>
-                      <th>Interval</th>
-                      <th>Due</th>
-                      <th />
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {actionable.map(({ task, due }) => (
-                      <tr key={task.id}>
-                        <td>
-                          <StatusBadge status={due.status} />
-                        </td>
-                        <td>
-                          <Link href={`/assets/${task.asset.id}`} className="link">
-                            {task.asset.name}
-                          </Link>
-                          <div className="text-xs text-slate-500">{task.asset.location}</div>
-                        </td>
-                        <td>{task.title}</td>
-                        <td className="text-slate-600">{describeInterval(task, task.asset.meterUnit)}</td>
-                        <td>
-                          <DueText due={due} meterUnit={task.asset.meterUnit} />
-                        </td>
-                        <td className="text-right">
-                          <Link href={`/tasks/${task.id}/complete`} className="link whitespace-nowrap">
-                            Complete →
-                          </Link>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
+        <div className="space-y-6">
+          <Card
+            title="Needs attention"
+            actions={
+              <Link href="/work-orders" className="link text-sm">
+                All work orders →
+              </Link>
+            }
+          >
+            <OpenWorkOrderList rows={attention} empty="Nothing overdue or due this week. Nice." />
+          </Card>
+          {mine.length > 0 && (
+            <Card title="Assigned to me">
+              <OpenWorkOrderList rows={mine} empty="" />
+            </Card>
           )}
-        </Card>
+        </div>
       )}
     </>
   );
 }
 
-function Stat({ label, value, tone }: { label: string; value: number; tone: string }) {
+function Stat({ label, value, tone, href }: { label: string; value: number; tone: string; href: string }) {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <Link href={href} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm hover:border-slate-300">
       <div className="text-sm text-slate-500">{label}</div>
       <div className={`text-3xl font-semibold tabular-nums ${tone}`}>{value}</div>
-    </div>
+    </Link>
   );
 }

@@ -3,15 +3,25 @@
 //
 // A task can be due by calendar, by usage (meter), or both. With both, the
 // task is due at whichever limit is reached first.
+//
+// Calendar schedules come in two kinds:
+//   COMPLETION — next due is one interval after it was last done
+//   FIXED      — due on a fixed calendar: startDate, startDate + 1 interval, …
+//                however early or late each one was done
 
 export type IntervalUnit = "DAY" | "WEEK" | "MONTH" | "YEAR";
+export type ScheduleBasis = "COMPLETION" | "FIXED";
 export type DueStatus = "OVERDUE" | "DUE_SOON" | "OK" | "NO_SCHEDULE";
 
 export interface ScheduleInput {
   calendarEvery: number | null;
   calendarUnit: IntervalUnit | null;
   usageEvery: number | null;
+  scheduleBasis: ScheduleBasis;
+  /** First calendar due date. */
   startDate: Date;
+  /** FIXED schedules: index of the next occurrence. */
+  fixedCycle: number;
   startMeter: number | null;
   lastDoneAt: Date | null;
   lastDoneMeter: number | null;
@@ -71,9 +81,13 @@ export function computeDue(task: ScheduleInput, currentMeter: number | null, now
   let nextDueAt: Date | null = null;
   let daysLeft: number | null = null;
   if (task.calendarEvery && task.calendarUnit) {
-    const base = task.lastDoneAt ?? task.startDate;
-    nextDueAt = addInterval(base, task.calendarEvery, task.calendarUnit);
-    daysLeft = Math.floor((startOfUtcDay(nextDueAt) - startOfUtcDay(now)) / DAY_MS);
+    nextDueAt =
+      task.scheduleBasis === "FIXED"
+        ? fixedOccurrence(task.startDate, task.calendarEvery, task.calendarUnit, task.fixedCycle)
+        : task.lastDoneAt
+          ? addInterval(task.lastDoneAt, task.calendarEvery, task.calendarUnit)
+          : task.startDate;
+    daysLeft = daysUntil(nextDueAt, now);
   }
 
   let nextDueMeter: number | null = null;
@@ -99,6 +113,31 @@ export function computeDue(task: ScheduleInput, currentMeter: number | null, now
   return { status, nextDueAt, nextDueMeter, daysLeft, meterLeft };
 }
 
+/** Occurrence n of a fixed schedule (n = 0 is the start date). Counted from
+ *  the start each time so month-end dates don't drift (Jan 31, Feb 28, Mar 31). */
+export function fixedOccurrence(start: Date, every: number, unit: IntervalUnit, n: number): Date {
+  return addInterval(start, every * n, unit);
+}
+
+/** FIXED schedules: the cycle to schedule next after occurrence `doneCycle` was
+ *  done on `doneAt`. Occurrences already past by then are skipped — the work
+ *  was just done, so there's no point having it due again in the past. */
+export function nextFixedCycle(
+  task: Pick<ScheduleInput, "startDate" | "calendarEvery" | "calendarUnit">,
+  doneCycle: number,
+  doneAt: Date,
+): number {
+  if (!task.calendarEvery || !task.calendarUnit) return doneCycle + 1;
+  let n = doneCycle + 1;
+  while (startOfUtcDay(fixedOccurrence(task.startDate, task.calendarEvery, task.calendarUnit, n)) <= startOfUtcDay(doneAt)) n++;
+  return n;
+}
+
+/** Whole days from `now` until `date` (negative = past). */
+export function daysUntil(date: Date, now: Date = new Date()): number {
+  return Math.floor((startOfUtcDay(date) - startOfUtcDay(now)) / DAY_MS);
+}
+
 const STATUS_RANK: Record<DueStatus, number> = { OVERDUE: 0, DUE_SOON: 1, OK: 2, NO_SCHEDULE: 3 };
 
 /** Sort most urgent first: status, then fewest days left. */
@@ -108,11 +147,15 @@ export function compareDue(a: DueInfo, b: DueInfo): number {
   return (a.daysLeft ?? Infinity) - (b.daysLeft ?? Infinity);
 }
 
-export function describeInterval(task: Pick<ScheduleInput, "calendarEvery" | "calendarUnit" | "usageEvery">, meterUnit: string | null): string {
+export function describeInterval(
+  task: Pick<ScheduleInput, "calendarEvery" | "calendarUnit" | "usageEvery"> & { scheduleBasis?: ScheduleBasis },
+  meterUnit: string | null,
+): string {
   const parts: string[] = [];
   if (task.calendarEvery && task.calendarUnit) {
     const unit = task.calendarUnit.toLowerCase();
-    parts.push(task.calendarEvery === 1 ? `every ${unit}` : `every ${task.calendarEvery} ${unit}s`);
+    const fixed = task.scheduleBasis === "FIXED" ? " (fixed)" : "";
+    parts.push((task.calendarEvery === 1 ? `every ${unit}` : `every ${task.calendarEvery} ${unit}s`) + fixed);
   }
   if (task.usageEvery) parts.push(`every ${task.usageEvery} ${meterUnit ?? "units"}`);
   return parts.length ? parts.join(" or ") : "no schedule";

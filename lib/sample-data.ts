@@ -1,8 +1,23 @@
-// Sample equipment with typical PM tasks, for trying the system out.
+// Sample equipment with typical PM schedules, for trying the system out.
 // Used by the "Load sample equipment" button and by `npm run db:seed`.
 import type { Prisma } from "@prisma/client";
+import type { ChecklistItem } from "@/lib/checklist";
 
-const daysAgo = (n: number) => new Date(Date.now() - n * 86_400_000);
+const DAY = 86_400_000;
+/** A date n days from today (negative = past), at 12:00 UTC like date inputs. */
+function day(n: number): Date {
+  const d = new Date(Date.now() + n * DAY);
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), 12));
+}
+function firstOfNextMonth(): Date {
+  const d = new Date();
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1, 12));
+}
+
+const check = (label: string): ChecklistItem => ({ label, type: "CHECK" });
+const passFail = (label: string): ChecklistItem => ({ label, type: "PASS_FAIL" });
+const number = (label: string, unit?: string): ChecklistItem => ({ label, type: "NUMBER", unit });
+const text = (label: string): ChecklistItem => ({ label, type: "TEXT" });
 
 /** Adds the sample assets. Does nothing if any assets already exist. */
 export async function loadSampleData(tx: Prisma.TransactionClient): Promise<boolean> {
@@ -23,18 +38,24 @@ export async function loadSampleData(tx: Prisma.TransactionClient): Promise<bool
             title: "Drain receiver tank & check for leaks",
             calendarEvery: 1,
             calendarUnit: "WEEK",
-            startDate: daysAgo(9),
-            checklist: ["Drain condensate from receiver", "Check auto-drain operation", "Listen for leaks at fittings"],
+            startDate: day(-2),
+            priority: "MEDIUM",
+            checklist: [
+              check("Drain condensate from receiver"),
+              passFail("Auto-drain operating"),
+              passFail("No leaks at fittings"),
+              number("Tank pressure", "psi"),
+            ],
           },
           {
             title: "Change oil & oil filter",
             calendarEvery: 12,
             calendarUnit: "MONTH",
             usageEvery: 2000,
-            startDate: daysAgo(200),
+            startDate: day(165),
             startMeter: 10_700,
             estimatedMinutes: 60,
-            checklist: ["Lock out / tag out", "Drain oil", "Replace oil filter", "Refill to level", "Run and check for leaks"],
+            checklist: [check("Lock out / tag out"), check("Drain oil"), check("Replace oil filter"), check("Refill to level"), passFail("No leaks after run")],
           },
         ],
       },
@@ -57,15 +78,22 @@ export async function loadSampleData(tx: Prisma.TransactionClient): Promise<bool
             calendarEvery: 1,
             calendarUnit: "DAY",
             dueSoonDays: 0,
-            startDate: daysAgo(1),
-            checklist: ["Tires & forks", "Horn, lights, backup alarm", "Brakes & parking brake", "Fluid leaks", "Seat belt"],
+            startDate: day(0),
+            priority: "HIGH",
+            checklist: [
+              passFail("Tires & forks"),
+              passFail("Horn, lights, backup alarm"),
+              passFail("Brakes & parking brake"),
+              passFail("No fluid leaks"),
+              passFail("Seat belt"),
+            ],
           },
           {
             title: "250-hour service",
             usageEvery: 250,
-            startDate: daysAgo(30),
+            startDate: day(0),
             startMeter: 4_990,
-            checklist: ["Engine oil & filter", "Grease fittings", "Check hydraulic fluid", "Inspect chains & mast"],
+            checklist: [check("Engine oil & filter"), check("Grease fittings"), check("Check hydraulic fluid"), passFail("Chains & mast")],
           },
         ],
       },
@@ -84,8 +112,8 @@ export async function loadSampleData(tx: Prisma.TransactionClient): Promise<bool
             title: "Replace air filters",
             calendarEvery: 3,
             calendarUnit: "MONTH",
-            startDate: daysAgo(80),
-            checklist: ["Replace filters (size on unit label)", "Check belt tension", "Clear condensate drain"],
+            startDate: day(10),
+            checklist: [check("Replace filters"), text("Filter size used"), passFail("Belt tension"), check("Clear condensate drain")],
           },
         ],
       },
@@ -103,8 +131,9 @@ export async function loadSampleData(tx: Prisma.TransactionClient): Promise<bool
             title: "Monthly visual inspection",
             calendarEvery: 1,
             calendarUnit: "MONTH",
-            startDate: daysAgo(20),
-            checklist: ["Pressure gauge in green", "Pin & tamper seal intact", "Accessible & signed", "Initial inspection tag"],
+            scheduleBasis: "FIXED",
+            startDate: firstOfNextMonth(),
+            checklist: [passFail("Pressure gauge in green"), passFail("Pin & tamper seal intact"), passFail("Accessible & signed"), check("Initial inspection tag")],
           },
         ],
       },

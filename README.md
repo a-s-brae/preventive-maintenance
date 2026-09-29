@@ -12,16 +12,18 @@ computer (`npm run local`) or hosted on Vercel.
 
 | Area | Details |
 |------|---------|
-| **Assets** | Name, tag, category, location, make/model/serial, status (active / inactive / retired), optional meter (hours, cycles, miles…). |
-| **PM tasks** | Each asset can have many. Interval by **calendar** (every N days/weeks/months/years), **usage** (every N meter units), or **both**. With both, the task is due at whichever comes first. Each task has a checklist, instructions and an estimated time. |
-| **Due status** | **Overdue**, **Due soon**, or **OK**. "Due soon" starts N days before the calendar date (capped at ¼ of the interval) or in the last 10% of the usage interval. |
-| **Completing PM** | The tech ticks the checklist, enters the date, meter reading and notes. The schedule then resets from that date and reading. |
-| **Meter readings** | Log a reading any time. Readings can't go backwards. |
-| **Ad-hoc work** | Log repairs and inspections on any asset. They appear in the history but don't affect schedules. |
+| **Work orders** | The unit of maintenance work: numbered (WO-0001), with type (PM, repair, inspection), status (open, in progress, on hold, complete), priority, assignee, due date, checklist and completion notes. List, "assigned to me", completed and calendar views. |
+| **PM schedules** | Each asset can have many. Interval by **calendar** (every N days/weeks/months/years), **usage** (every N meter units), or **both** (whichever comes first). When one comes due it **creates a work order** automatically, with its checklist, priority and default assignee. "Start early" creates it before it's due. |
+| **Fixed vs. from completion** | After each completion, the next calendar due date is either counted from when it was done, or kept on a **fixed calendar** (e.g. the 1st of every month) — for compliance checks. |
+| **Checklists** | Items can be a checkbox, **pass / fail**, a **number** reading (with unit, e.g. psi) or **text**. Answers are saved with the completed work order; failed items are flagged in the history. |
+| **Due status** | **Overdue**, **Due soon**, or **OK**. A PM's work order is created N days before its calendar date (capped at ¼ of the interval) or in the last 10% of its usage interval. |
+| **Assets** | Name, tag, category, location, make/model/serial, status (active / inactive / retired), optional meter (hours, cycles, miles…). Asset pages show open work orders, PM schedules and history. |
+| **Meter readings** | Log a reading any time (or when completing a work order). Readings can't go backwards. |
 | **Sign-in** | Email magic link, restricted to `ALLOWED_EMAIL_DOMAINS` (default `as-plastech.com`). In local mode, sign-in skips the email step. |
 
-The due-date rules live in [`lib/schedule.ts`](lib/schedule.ts) as pure functions and are
-covered by [`lib/schedule.test.ts`](lib/schedule.test.ts).
+The due-date rules ([`lib/schedule.ts`](lib/schedule.ts)), work order due status
+([`lib/work-orders.ts`](lib/work-orders.ts)) and checklist handling
+([`lib/checklist.ts`](lib/checklist.ts)) are pure functions with unit tests next to them.
 
 ## Run it on your computer (no Vercel needed)
 
@@ -110,25 +112,33 @@ the new folder in `prisma/migrations/`.
 app/
   login/                  magic-link sign-in + "check your email"
   (app)/                  everything behind sign-in
-    page.tsx              dashboard: overdue / due soon
-    assets/               list, new, [id] detail, edit, add task, log work
-    tasks/[id]/           edit, complete
-    history/              all work logs
+    page.tsx              dashboard: overdue / due this week / assigned to me
+    work-orders/          list, new, [id] detail + complete, [id]/edit, calendar
+    pm/                   all PM schedules
+    assets/               list, new, [id] detail, edit, add PM schedule
+    tasks/[id]/edit       edit a PM schedule
+    history/              completed work orders
 auth.ts                   Auth.js config + domain allow-list + requireUser()
-lib/schedule.ts           due-date rules (pure, tested)
+lib/schedule.ts           PM due-date rules (pure, tested)
+lib/work-orders.ts        PM → work order generation, work order due status
+lib/checklist.ts          typed checklist items and answers (pure, tested)
 lib/actions.ts            server actions (all writes)
+lib/queries.ts            shared reads (open work orders, PM schedules, users)
 lib/forms.ts              zod validation + formatting helpers
 prisma/schema.prisma      data model
 lib/sample-data.ts        sample equipment ("Load sample equipment" / npm run db:seed)
 scripts/local.mjs         `npm run local`: local database + app on this computer
 ```
 
-## Planned / easy next steps
+## Roadmap
 
-- Roles (admin vs. tech vs. read-only) — there's a single role today.
-- Email digest of overdue / due-soon PM (Vercel Cron + Resend).
-- Photo attachments on work logs (Vercel Blob).
-- Parts / inventory used per work order.
-- Production equipment: presses and molds work today as assets with meters
-  (hours or shots); later, pull shot counts in automatically instead of entering them.
-- CSV import of an existing equipment list.
+Modeled on the layout of [Atlas CMMS](https://github.com/Grashjs/cmms) (ideas only — no code
+is copied; Atlas is AGPL).
+
+1. ~~Work orders as the core, fixed schedules, typed checklists, calendar~~ ✅
+2. Plant structure: locations list, parent/child assets, asset status with downtime
+   logging, a request form so operators can report problems.
+3. Parts used on work orders with min-stock alerts, labor time, photos, roles
+   (admin / tech / requester), email for overdue work.
+4. Reports (PM compliance, MTBF / MTTR, cost per asset), QR labels on equipment,
+   meter threshold alerts.

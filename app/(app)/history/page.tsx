@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { LogTable } from "@/components/log-table";
+import { workOrderInclude } from "@/lib/queries";
+import { CompletedWorkOrderTable } from "@/components/work-order-table";
 import { Card, PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -9,22 +10,24 @@ const PAGE_SIZE = 50;
 
 export default async function HistoryPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
   const page = Math.max(1, Number((await searchParams).page) || 1);
-  const [logs, total] = await Promise.all([
-    db.workLog.findMany({
-      orderBy: [{ performedAt: "desc" }, { createdAt: "desc" }],
+  const where = { status: "COMPLETE" as const };
+  const [rows, total] = await Promise.all([
+    db.workOrder.findMany({
+      where,
+      orderBy: [{ completedAt: "desc" }, { number: "desc" }],
       skip: (page - 1) * PAGE_SIZE,
       take: PAGE_SIZE,
-      include: { task: true, performedBy: true, asset: true },
+      include: workOrderInclude,
     }),
-    db.workLog.count(),
+    db.workOrder.count({ where }),
   ]);
   const pages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
   return (
     <>
-      <PageHeader title="Work history" />
+      <PageHeader title="Maintenance history" />
       <Card>
-        <LogTable logs={logs} />
+        <CompletedWorkOrderTable rows={rows} />
         {pages > 1 && (
           <div className="mt-4 flex items-center justify-between text-sm">
             {page > 1 ? <Link href={`/history?page=${page - 1}`} className="link">← Newer</Link> : <span />}

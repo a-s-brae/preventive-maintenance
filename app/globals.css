@@ -17,6 +17,10 @@
     @apply inline-flex items-center justify-center rounded-md bg-white px-4 py-2 text-sm font-medium text-red-700
       shadow-sm ring-1 ring-red-300 ring-inset hover:bg-red-50;
   }
+  .btn-icon {
+    @apply inline-flex size-9 items-center justify-center rounded-md bg-white text-sm text-slate-600 ring-1 ring-slate-300 ring-inset
+      hover:bg-slate-50 disabled:opacity-40;
+  }
   .table {
     @apply w-full text-left text-sm;
   }

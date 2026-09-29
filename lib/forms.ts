@@ -49,18 +49,24 @@ export const assetSchema = z.object({
   notes: optText,
 });
 
+const priority = z.enum(["NONE", "LOW", "MEDIUM", "HIGH"]).default("NONE");
+const optDate = z.preprocess(blankToUndef, dateOnly.optional());
+
+/** PM schedule. The checklist comes from the checklist editor, parsed separately. */
 export const taskSchema = z
   .object({
     title: reqText,
     instructions: optText,
-    checklist: z.string().default(""),
     calendarEvery: optInt,
     calendarUnit: z.preprocess(blankToUndef, z.enum(["DAY", "WEEK", "MONTH", "YEAR"]).optional()),
     usageEvery: z.preprocess(blankToUndef, z.coerce.number().positive().optional()),
+    scheduleBasis: z.enum(["COMPLETION", "FIXED"]).default("COMPLETION"),
     startDate: dateOnly,
     startMeter: optNumber,
     dueSoonDays: z.coerce.number().int().min(0).max(365).default(7),
     estimatedMinutes: optInt,
+    priority,
+    defaultAssigneeId: optText,
     active: z.preprocess((v) => v === "on" || v === "true", z.boolean()),
   })
   .refine((t) => (t.calendarEvery == null) === (t.calendarUnit == null), {
@@ -70,17 +76,20 @@ export const taskSchema = z
   .refine((t) => t.calendarEvery != null || t.usageEvery != null, {
     message: "Set a calendar interval, a usage interval, or both",
     path: ["calendarEvery"],
-  })
-  .transform((t) => ({
-    ...t,
-    checklist: t.checklist
-      .split("\n")
-      .map((s) => s.trim())
-      .filter(Boolean),
-  }));
+  });
 
-export const logSchema = z.object({
-  kind: z.enum(["PM", "REPAIR", "INSPECTION"]).default("PM"),
+/** Creating or editing a work order by hand. */
+export const workOrderSchema = z.object({
+  type: z.enum(["REPAIR", "INSPECTION"]).default("REPAIR"),
+  title: reqText,
+  description: optText,
+  assetId: z.string().min(1, "Pick an asset"),
+  priority,
+  dueDate: optDate,
+  assignedToId: optText,
+});
+
+export const completeSchema = z.object({
   performedAt: dateOnly,
   meterReading: optNumber,
   notes: optText,

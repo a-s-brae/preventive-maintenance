@@ -25,10 +25,30 @@ enum IntervalUnit {
   YEAR
 }
 
-enum LogKind {
-  PM          // scheduled preventive maintenance
-  REPAIR      // corrective / breakdown work
-  INSPECTION  // ad-hoc check
+enum WorkOrderType {
+  PM // generated from a PM schedule
+  REPAIR // corrective / breakdown work
+  INSPECTION // ad-hoc check
+}
+
+enum WorkOrderStatus {
+  OPEN
+  IN_PROGRESS
+  ON_HOLD
+  COMPLETE
+}
+
+enum Priority {
+  NONE
+  LOW
+  MEDIUM
+  HIGH
+}
+
+/// How the next calendar due date is found after a PM is done.
+enum ScheduleBasis {
+  COMPLETION // N units after it was last done
+  FIXED // on a fixed calendar (e.g. the 1st of every month), however late it was done
 }
 
 /// A piece of equipment. Deliberately generic (compressor, forklift, HVAC,
@@ -51,60 +71,92 @@ model Asset {
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
-  tasks    PmTask[]
-  logs     WorkLog[]
-  readings MeterReading[]
+  tasks      PmTask[]
+  workOrders WorkOrder[]
+  readings   MeterReading[]
 
   @@index([status])
 }
 
-/// A recurring PM task on one asset. Due by calendar, by usage, or both
-/// (whichever comes first).
+/// A recurring PM schedule on one asset. When it comes due it creates a work
+/// order. Due by calendar, by usage, or both (whichever comes first).
 model PmTask {
-  id               String        @id @default(cuid())
-  assetId          String
-  asset            Asset         @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  title            String
-  instructions     String?
-  checklist        String[]
-  calendarEvery    Int?
-  calendarUnit     IntervalUnit?
-  usageEvery       Float?
-  /// Baselines used until the task is first completed.
-  startDate        DateTime
-  startMeter       Float?
-  lastDoneAt       DateTime?
-  lastDoneMeter    Float?
-  /// Days before the calendar due date that the task shows as "due soon".
-  dueSoonDays      Int           @default(7)
-  estimatedMinutes Int?
-  active           Boolean       @default(true)
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
+  id                String        @id @default(cuid())
+  assetId           String
+  asset             Asset         @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  title             String
+  instructions      String?
+  /// ChecklistItem[] — see lib/checklist.ts
+  checklist         Json          @default("[]")
+  calendarEvery     Int?
+  calendarUnit      IntervalUnit?
+  usageEvery        Float?
+  scheduleBasis     ScheduleBasis @default(COMPLETION)
+  /// First calendar due date.
+  startDate         DateTime
+  /// Meter baseline until the task is first completed.
+  startMeter        Float?
+  lastDoneAt        DateTime?
+  lastDoneMeter     Float?
+  /// FIXED schedules: index of the next occurrence (startDate + n × interval).
+  fixedCycle        Int           @default(0)
+  /// Days before the calendar due date that the work order is created.
+  dueSoonDays       Int           @default(7)
+  estimatedMinutes  Int?
+  priority          Priority      @default(NONE)
+  defaultAssigneeId String?
+  defaultAssignee   User?         @relation("PmDefaultAssignee", fields: [defaultAssigneeId], references: [id], onDelete: SetNull)
+  active            Boolean       @default(true)
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
 
-  logs WorkLog[]
+  workOrders WorkOrder[]
 
   @@index([assetId])
 }
 
-model WorkLog {
-  id               String   @id @default(cuid())
-  kind             LogKind  @default(PM)
+model WorkOrder {
+  id               String          @id @default(cuid())
+  /// Human-friendly number, shown as WO-0001.
+  number           Int             @unique @default(autoincrement())
+  type             WorkOrderType
+  status           WorkOrderStatus @default(OPEN)
+  priority         Priority        @default(NONE)
+  title            String
+  description      String?
   assetId          String
-  asset            Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  taskId           String?
-  task             PmTask?  @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  performedAt      DateTime
-  performedById    String?
-  performedBy      User?    @relation(fields: [performedById], references: [id], onDelete: SetNull)
-  meterReading     Float?
-  notes            String?
-  /// [{ item: string, done: boolean }]
+  asset            Asset           @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  pmTaskId         String?
+  pmTask           PmTask?         @relation(fields: [pmTaskId], references: [id], onDelete: SetNull)
+  /// Set to pmTaskId while this PM work order is open, so a schedule can only
+  /// ever have one open work order.
+  openForTaskId    String?         @unique
+  /// FIXED schedules: which occurrence of the schedule this is.
+  cycle            Int?
+  dueDate          DateTime?
+  /// Usage-based PM: meter reading it's due at.
+  dueMeter         Float?
+  /// ChecklistItem[] copied from the PM when the work order is created.
+  checklist        Json            @default("[]")
+  /// ChecklistResult[] filled in on completion.
   checklistResults Json?
-  createdAt        DateTime @default(now())
+  assignedToId     String?
+  assignedTo       User?           @relation("WorkOrderAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdById      String?
+  createdBy        User?           @relation("WorkOrderCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  startedAt        DateTime?
+  completedAt      DateTime?
+  completedById    String?
+  completedBy      User?           @relation("WorkOrderCompleter", fields: [completedById], references: [id], onDelete: SetNull)
+  meterReading     Float?
+  completionNotes  String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
 
-  @@index([assetId, performedAt])
-  @@index([taskId])
+  @@index([status, dueDate])
+  @@index([assetId, completedAt])
+  @@index([pmTaskId])
+  @@index([assignedToId])
 }
 
 model MeterReading {
@@ -132,8 +184,12 @@ model User {
 
   accounts Account[]
   sessions Session[]
-  logs     WorkLog[]
   readings MeterReading[]
+
+  assignedWorkOrders  WorkOrder[] @relation("WorkOrderAssignee")
+  createdWorkOrders   WorkOrder[] @relation("WorkOrderCreator")
+  completedWorkOrders WorkOrder[] @relation("WorkOrderCompleter")
+  defaultForPmTasks   PmTask[]    @relation("PmDefaultAssignee")
 }
 
 model Account {

@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 import { requireUser } from "@/auth";
 import { db } from "@/lib/db";
+import { loadSampleData } from "@/lib/sample-data";
 import { assetSchema, firstError, logSchema, optNumber, taskSchema, type FormState } from "@/lib/forms";
 
 const fields = (fd: FormData) => Object.fromEntries(fd.entries());
@@ -34,6 +35,12 @@ export async function saveAsset(assetId: string | null, _prev: FormState, fd: Fo
   }
   revalidatePath("/", "layout");
   redirect(`/assets/${id}`);
+}
+
+export async function loadSampleAssets() {
+  await requireUser();
+  await db.$transaction((tx) => loadSampleData(tx));
+  revalidatePath("/", "layout");
 }
 
 export async function deleteAsset(assetId: string) {

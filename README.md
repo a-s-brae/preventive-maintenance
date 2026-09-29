@@ -5,7 +5,8 @@ schedules (by calendar, by usage, or both), gives techs checklists to complete, 
 keeps a full work history.
 
 **Stack:** Next.js 16 (App Router, server actions) · Prisma 6 · Neon Postgres ·
-Auth.js v5 email magic links (via Resend) · Tailwind CSS 4 · hosted on Vercel.
+Auth.js v5 email magic links (via Resend) · Tailwind CSS 4. It runs on one
+computer (`npm run local`) or hosted on Vercel.
 
 ## What it does
 
@@ -17,10 +18,49 @@ Auth.js v5 email magic links (via Resend) · Tailwind CSS 4 · hosted on Vercel.
 | **Completing PM** | The tech ticks the checklist, enters the date, meter reading and notes. The schedule then resets from that date and reading. |
 | **Meter readings** | Log a reading any time. Readings can't go backwards. |
 | **Ad-hoc work** | Log repairs and inspections on any asset. They appear in the history but don't affect schedules. |
-| **Sign-in** | Email magic link, restricted to `ALLOWED_EMAIL_DOMAINS` (default `as-plastech.com`). |
+| **Sign-in** | Email magic link, restricted to `ALLOWED_EMAIL_DOMAINS` (default `as-plastech.com`). In local mode, sign-in skips the email step. |
 
 The due-date rules live in [`lib/schedule.ts`](lib/schedule.ts) as pure functions and are
 covered by [`lib/schedule.test.ts`](lib/schedule.test.ts).
+
+## Run it on your computer (no Vercel needed)
+
+All you need is **Node.js**. The database runs on your computer, and there's no
+account, email service or cloud setup.
+
+1. Install **Node.js LTS** from [nodejs.org](https://nodejs.org) (accept the defaults).
+2. Unzip this folder somewhere permanent, e.g. `Documents\pm-system`.
+3. Start it:
+   - **Windows:** double-click **`Start PM System.cmd`**.
+   - **Mac / anything else:** open a terminal in the folder and run `npm run local`.
+4. The first start takes a few minutes: it installs dependencies, creates the
+   database and builds the app. Later starts take about 10 seconds. Your browser
+   opens **http://localhost:3000** when it's ready.
+5. Sign in with your company email. In local mode there's no email check, so
+   you're signed in right away.
+6. On the empty dashboard, click **Load sample equipment** to try it out, or
+   **Add asset** to start entering real equipment.
+
+**Keep the window open** while you use it. Close it (or press Ctrl+C) to stop.
+
+| Command | What it does |
+|---------|--------------|
+| `npm run local` | Start the app (and the database). |
+| `npm run local:stop` | Stop the background database. The app stops when you close its window. |
+| `npm run local:reset` | **Delete all local data** and start over (asks you to type `DELETE`). |
+
+**Where the data lives:** in Prisma's local database folder in your user profile.
+On Windows that's `%LOCALAPPDATA%\prisma-dev-nodejs`, and on a Mac
+`~/Library/Application Support/prisma-dev-nodejs`. The data survives restarts and
+replacing the app folder with a newer version. It is **not backed up**, so treat
+local mode as a trial or a stopgap.
+
+**Letting coworkers use it:** while it's running, anyone on the same network can open
+`http://<this computer's IP>:3000`. The startup output shows the address as
+"Network". Windows may ask whether to let Node.js through the firewall; allow it
+on private networks. Keep in mind that local mode doesn't verify emails, so anyone
+who can reach the page can sign in as any company address. The computer has to
+stay on and awake for others to use it.
 
 ## Deploy to Vercel (first time)
 
@@ -46,23 +86,23 @@ covered by [`lib/schedule.test.ts`](lib/schedule.test.ts).
    are created on the first deploy.
 6. Open the site, sign in with your company email, and add your first asset.
 
-To load the sample assets (compressor, forklift, HVAC, extinguishers) into an empty
-database, run `npm run db:seed` locally against that database.
+On an empty database the dashboard offers **Load sample equipment** (compressor,
+forklift, HVAC, extinguishers) so you can try it out before entering real assets.
 
 ## Local development
 
+Run `npm run local` once. It creates `.env` and starts the local database, and
+the database keeps running in the background after you stop the app. Then:
+
 ```bash
-npm install
-cp .env.example .env        # fill in DATABASE_URL etc. (a Neon dev branch works well)
-npx prisma migrate dev      # create tables
-npm run db:seed             # optional sample data
-npm run dev                 # http://localhost:3000
+npm run dev                 # http://localhost:3000, with hot reload
 npm test                    # scheduling unit tests
 npm run lint                # typecheck
 ```
 
-After changing `prisma/schema.prisma`, run `npx prisma migrate dev --name <change>` and
-commit the new folder in `prisma/migrations/`.
+After changing `prisma/schema.prisma`, run `npm run local:migrate -- --name <change>`
+(or `npx prisma migrate dev --name <change>` against a regular Postgres) and commit
+the new folder in `prisma/migrations/`.
 
 ## Project layout
 
@@ -79,7 +119,8 @@ lib/schedule.ts           due-date rules (pure, tested)
 lib/actions.ts            server actions (all writes)
 lib/forms.ts              zod validation + formatting helpers
 prisma/schema.prisma      data model
-prisma/seed.ts            sample data
+lib/sample-data.ts        sample equipment ("Load sample equipment" / npm run db:seed)
+scripts/local.mjs         `npm run local`: local database + app on this computer
 ```
 
 ## Planned / easy next steps

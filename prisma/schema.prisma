@@ -1,0 +1,175 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  // Neon: DATABASE_URL is the pooled connection, DATABASE_URL_UNPOOLED is direct
+  // (used by migrations). The Vercel ↔ Neon integration sets both.
+  url       = env("DATABASE_URL")
+  directUrl = env("DATABASE_URL_UNPOOLED")
+}
+
+// ─── Maintenance domain ──────────────────────────────────────────────────────
+
+enum AssetStatus {
+  ACTIVE
+  INACTIVE
+  RETIRED
+}
+
+enum IntervalUnit {
+  DAY
+  WEEK
+  MONTH
+  YEAR
+}
+
+enum LogKind {
+  PM          // scheduled preventive maintenance
+  REPAIR      // corrective / breakdown work
+  INSPECTION  // ad-hoc check
+}
+
+/// A piece of equipment. Deliberately generic (compressor, forklift, HVAC,
+/// press, …) so the system can grow from facility gear into production.
+model Asset {
+  id             String      @id @default(cuid())
+  name           String
+  assetTag       String?     @unique
+  category       String?
+  location       String?
+  manufacturer   String?
+  model          String?
+  serialNumber   String?
+  status         AssetStatus @default(ACTIVE)
+  /// Unit for usage-based PM, e.g. "hours", "cycles", "miles". Null = no meter.
+  meterUnit      String?
+  currentMeter   Float?
+  meterUpdatedAt DateTime?
+  notes          String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  tasks    PmTask[]
+  logs     WorkLog[]
+  readings MeterReading[]
+
+  @@index([status])
+}
+
+/// A recurring PM task on one asset. Due by calendar, by usage, or both
+/// (whichever comes first).
+model PmTask {
+  id               String        @id @default(cuid())
+  assetId          String
+  asset            Asset         @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  title            String
+  instructions     String?
+  checklist        String[]
+  calendarEvery    Int?
+  calendarUnit     IntervalUnit?
+  usageEvery       Float?
+  /// Baselines used until the task is first completed.
+  startDate        DateTime
+  startMeter       Float?
+  lastDoneAt       DateTime?
+  lastDoneMeter    Float?
+  /// Days before the calendar due date that the task shows as "due soon".
+  dueSoonDays      Int           @default(7)
+  estimatedMinutes Int?
+  active           Boolean       @default(true)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  logs WorkLog[]
+
+  @@index([assetId])
+}
+
+model WorkLog {
+  id               String   @id @default(cuid())
+  kind             LogKind  @default(PM)
+  assetId          String
+  asset            Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  taskId           String?
+  task             PmTask?  @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  performedAt      DateTime
+  performedById    String?
+  performedBy      User?    @relation(fields: [performedById], references: [id], onDelete: SetNull)
+  meterReading     Float?
+  notes            String?
+  /// [{ item: string, done: boolean }]
+  checklistResults Json?
+  createdAt        DateTime @default(now())
+
+  @@index([assetId, performedAt])
+  @@index([taskId])
+}
+
+model MeterReading {
+  id           String   @id @default(cuid())
+  assetId      String
+  asset        Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  value        Float
+  recordedAt   DateTime @default(now())
+  recordedById String?
+  recordedBy   User?    @relation(fields: [recordedById], references: [id], onDelete: SetNull)
+
+  @@index([assetId, recordedAt])
+}
+
+// ─── Auth.js (magic-link sign-in) ────────────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+  logs     WorkLog[]
+  readings MeterReading[]
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}

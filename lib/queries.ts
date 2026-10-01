@@ -26,7 +26,8 @@ export type WorkOrderRow = Prisma.WorkOrderGetPayload<{ include: typeof workOrde
 export async function getOpenWorkOrders(where: Prisma.WorkOrderWhereInput = {}): Promise<WorkOrderRow[]> {
   await syncOnce();
   const rows = await db.workOrder.findMany({
-    where: { ...where, status: { in: [...OPEN_STATUSES] } },
+    // AND, not spread: the caller may filter on status too (e.g. only In progress).
+    where: { AND: [where, { status: { in: [...OPEN_STATUSES] } }] },
     include: workOrderInclude,
   });
   const now = new Date();
@@ -39,6 +40,19 @@ export async function getOpenWorkOrders(where: Prisma.WorkOrderWhereInput = {}):
         PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority] ||
         a.number - b.number,
     );
+}
+
+/** All open work orders, computed once per page render (the sidebar badges and
+ *  the dashboard both use it). */
+export const getAllOpenWorkOrders = cache(() => getOpenWorkOrders());
+
+/** Counts for the sidebar badges. */
+export async function getNavCounts(userId: string) {
+  const open = await getAllOpenWorkOrders();
+  return {
+    overdue: open.filter((wo) => wo.due.status === "OVERDUE").length,
+    mine: open.filter((wo) => wo.assignedToId === userId).length,
+  };
 }
 
 /** PM schedules with due info and their open work order, most urgent first. */

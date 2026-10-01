@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 import { requireUser } from "@/auth";
 import { db } from "@/lib/db";
-import { checklistFromForm, parseChecklist, resultsFromForm } from "@/lib/checklist";
+import { checklistFromForm, draftAnswers, NOTE_MAX, parseAnswer, parseChecklist, resultsFromForm, type ChecklistResult } from "@/lib/checklist";
 import { assetSchema, completeSchema, firstError, optNumber, taskSchema, workOrderSchema, type FormState } from "@/lib/forms";
 import { loadSampleData } from "@/lib/sample-data";
 import { nextFixedCycle } from "@/lib/schedule";
@@ -188,6 +188,51 @@ export async function setWorkOrderStatus(workOrderId: string, status: "OPEN" | "
     data: { status, startedAt: status === "IN_PROGRESS" ? (wo.startedAt ?? new Date()) : wo.startedAt },
   });
   revalidatePath("/", "layout");
+}
+
+/** Save one checklist answer (and its note) on an open work order as it's
+ *  entered, so a half-done PM keeps its answers. The first answer starts the
+ *  work order. Returns `started` when it moved the work order to In progress. */
+export async function saveChecklistAnswer(
+  workOrderId: string,
+  index: number,
+  raw: string,
+  note: string,
+): Promise<{ error?: string; started?: boolean }> {
+  await requireUser();
+  try {
+    return await db.$transaction(async (tx) => {
+      // Lock the row: two people answering different items at once must not
+      // overwrite each other's answers.
+      await tx.$queryRaw`SELECT id FROM "WorkOrder" WHERE id = ${workOrderId} FOR UPDATE`;
+      const wo = await tx.workOrder.findUniqueOrThrow({ where: { id: workOrderId } });
+      if (wo.status === "COMPLETE") throw new FormError("This work order is already complete");
+      const items = parseChecklist(wo.checklist);
+      const item = items[index];
+      if (!item) throw new FormError("That checklist item no longer exists — reload the page");
+      const answer = parseAnswer(item, raw);
+      if ("error" in answer) throw new FormError(answer.error);
+
+      const drafts = draftAnswers(items, wo.checklistResults);
+      const results: ChecklistResult[] = items.map((it, i) => ({
+        ...it,
+        value: drafts[i]?.value ?? (it.type === "CHECK" ? false : null),
+        ...(drafts[i]?.note && { note: drafts[i]!.note }),
+      }));
+      const trimmed = note.trim().slice(0, NOTE_MAX);
+      results[index] = { ...item, value: answer.value, ...(trimmed && { note: trimmed }) };
+
+      const start = wo.status === "OPEN";
+      await tx.workOrder.update({
+        where: { id: wo.id },
+        data: { checklistResults: results, ...(start && { status: "IN_PROGRESS", startedAt: wo.startedAt ?? new Date() }) },
+      });
+      return { started: start };
+    });
+  } catch (e) {
+    if (e instanceof FormError) return { error: e.message };
+    throw e;
+  }
 }
 
 /** Complete a work order. For PM work orders this also resets the schedule,

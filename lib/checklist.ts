@@ -25,7 +25,9 @@ export type ChecklistItem = z.infer<typeof itemSchema>;
 
 export type PassFail = "PASS" | "FAIL" | "NA";
 export type ChecklistValue = boolean | PassFail | number | string | null;
-export type ChecklistResult = ChecklistItem & { value: ChecklistValue };
+export type ChecklistResult = ChecklistItem & { value: ChecklistValue; note?: string };
+
+export const NOTE_MAX = 1000;
 
 /** Read a stored checklist (Json column). Invalid entries are dropped. */
 export function parseChecklist(json: unknown): ChecklistItem[] {
@@ -40,7 +42,9 @@ export function parseResults(json: unknown): ChecklistResult[] {
   if (!Array.isArray(json)) return [];
   return json.flatMap((raw) => {
     const [item] = parseChecklist([raw]);
-    return item ? [{ ...item, value: (raw as { value?: ChecklistValue }).value ?? null }] : [];
+    if (!item) return [];
+    const { value, note } = raw as { value?: ChecklistValue; note?: unknown };
+    return [{ ...item, value: value ?? null, ...(typeof note === "string" && note.trim() && { note: note.trim() }) }];
   });
 }
 
@@ -56,34 +60,41 @@ export function checklistFromForm(raw: FormDataEntryValue | null): ChecklistItem
   }
 }
 
-/** Collect answers from a completion form: fields are named `check-<index>`. */
+/** Read one answer as typed into its input. CHECK items send "on" when ticked. */
+export function parseAnswer(item: ChecklistItem, raw: FormDataEntryValue | string | null): { value: ChecklistValue } | { error: string } {
+  const str = typeof raw === "string" ? raw.trim() : "";
+  switch (item.type) {
+    case "CHECK":
+      return { value: str === "on" || str === "true" };
+    case "PASS_FAIL":
+      return { value: str === "PASS" || str === "FAIL" || str === "NA" ? str : null };
+    case "NUMBER": {
+      if (!str) return { value: null };
+      const n = Number(str);
+      return Number.isFinite(n) ? { value: n } : { error: `"${item.label}" needs a number` };
+    }
+    case "TEXT":
+      return { value: str ? str.slice(0, 1000) : null };
+  }
+}
+
+/** Collect answers from a completion form: fields are `check-<index>` and `note-<index>`. */
 export function resultsFromForm(items: ChecklistItem[], fd: FormData): { results: ChecklistResult[]; error?: string } {
   const results: ChecklistResult[] = [];
   for (const [i, item] of items.entries()) {
-    const raw = fd.get(`check-${i}`);
-    const str = typeof raw === "string" ? raw.trim() : "";
-    let value: ChecklistValue = null;
-    switch (item.type) {
-      case "CHECK":
-        value = raw === "on";
-        break;
-      case "PASS_FAIL":
-        value = str === "PASS" || str === "FAIL" || str === "NA" ? str : null;
-        break;
-      case "NUMBER":
-        if (str) {
-          const n = Number(str);
-          if (!Number.isFinite(n)) return { results, error: `"${item.label}" needs a number` };
-          value = n;
-        }
-        break;
-      case "TEXT":
-        value = str ? str.slice(0, 1000) : null;
-        break;
-    }
-    results.push({ ...item, value });
+    const answer = parseAnswer(item, fd.get(`check-${i}`));
+    if ("error" in answer) return { results, error: answer.error };
+    const note = String(fd.get(`note-${i}`) ?? "").trim().slice(0, NOTE_MAX);
+    results.push({ ...item, value: answer.value, ...(note && { note }) });
   }
   return { results };
+}
+
+/** Answers saved so far on an open work order, by item index. The draft is only
+ *  trusted if it still lines up with the checklist. */
+export function draftAnswers(items: ChecklistItem[], draft: unknown): (Pick<ChecklistResult, "value" | "note"> | undefined)[] {
+  const saved = parseResults(draft);
+  return items.map((item, i) => (saved[i]?.label === item.label && saved[i]?.type === item.type ? saved[i] : undefined));
 }
 
 export interface ChecklistSummary {

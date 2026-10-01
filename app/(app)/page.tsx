@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireUser } from "@/auth";
 import { db } from "@/lib/db";
 import { loadSampleAssets } from "@/lib/actions";
-import { getOpenWorkOrders } from "@/lib/queries";
+import { getAllOpenWorkOrders } from "@/lib/queries";
 import { OpenWorkOrderList } from "@/components/work-order-table";
 import { ButtonLink, Card, PageHeader } from "@/components/ui";
 
@@ -10,14 +10,14 @@ export const dynamic = "force-dynamic";
 
 export default async function Dashboard() {
   const user = await requireUser();
-  const [open, assetCount] = await Promise.all([getOpenWorkOrders(), db.asset.count()]);
+  const [open, assetCount] = await Promise.all([getAllOpenWorkOrders(), db.asset.count()]);
   const attention = open.filter((wo) => wo.due.status === "OVERDUE" || wo.due.status === "DUE_SOON");
   const mine = open.filter((wo) => wo.assignedToId === user.id);
 
   return (
     <>
       <PageHeader title="Dashboard">
-        <ButtonLink href="/work-orders/new">New work order</ButtonLink>
+        <ButtonLink href="/work-orders/new">+ Work order</ButtonLink>
       </PageHeader>
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">

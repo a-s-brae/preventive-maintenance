@@ -28,7 +28,10 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
   return (
     <>
       <PageHeader title="Assets">
-        <ButtonLink href="/assets/new">Add asset</ButtonLink>
+        <a href="/assets/export" className="btn-secondary" download>
+          Export CSV
+        </a>
+        <ButtonLink href="/assets/new">+ Asset</ButtonLink>
       </PageHeader>
       <form className="mb-4 flex flex-wrap items-center gap-3">
         <input name="q" defaultValue={q} placeholder="Search name, tag, location…" className="input max-w-xs" />

@@ -89,7 +89,8 @@ export function OpenWorkOrderList({ rows, showAsset = true, empty }: { rows: Wor
 }
 
 function DueBadge({ row }: { row: WorkOrderRow }) {
-  return row.due.status === "NO_SCHEDULE" ? <span className="text-xs text-slate-400">No due date</span> : <StatusBadge status={row.due.status} />;
+  // No badge without a due date; the due text already says "No due date".
+  return row.due.status === "NO_SCHEDULE" ? null : <StatusBadge status={row.due.status} />;
 }
 
 type CompletedRow = Omit<WorkOrderRow, "due">;

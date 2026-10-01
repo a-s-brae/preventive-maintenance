@@ -12,7 +12,11 @@ export default async function PmSchedulesPage() {
   const rows = await getPmSchedules({ asset: { status: { not: "RETIRED" } } });
   return (
     <>
-      <PageHeader title="PM schedules" />
+      <PageHeader title="PM schedules">
+        <a href="/pm/export" className="btn-secondary" download>
+          Export CSV
+        </a>
+      </PageHeader>
       <p className="-mt-3 mb-6 text-sm text-slate-600">
         Each schedule creates a work order when it comes due. To add a schedule, open an asset and choose <strong>Add PM schedule</strong>.
       </p>

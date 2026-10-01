@@ -19,6 +19,9 @@ computer (`npm run local`) or hosted on Vercel.
 | **Due status** | **Overdue**, **Due soon**, or **OK**. A PM's work order is created N days before its calendar date (capped at ¼ of the interval) or in the last 10% of its usage interval. |
 | **Assets** | Name, tag, category, location, make/model/serial, status (active / inactive / retired), optional meter (hours, cycles, miles…). Asset pages show open work orders, PM schedules and history. |
 | **Meter readings** | Log a reading any time (or when completing a work order). Readings can't go backwards. |
+| **Checklist autosave** | Each answer (and its optional note) is saved the moment it's entered, so a PM interrupted halfway keeps its answers. The first answer moves the work order to In progress. |
+| **Lists** | Filter chips for due / status / priority, search, and **Export CSV** on work orders, PM schedules and assets (the export matches the filters on screen). |
+| **Navigation** | Left sidebar with badges (overdue work orders, work assigned to you); a slide-out menu on phones and tablets. |
 | **Sign-in** | Email magic link, restricted to `ALLOWED_EMAIL_DOMAINS` (default `as-plastech.com`). In local mode, sign-in skips the email step. |
 
 The due-date rules ([`lib/schedule.ts`](lib/schedule.ts)), work order due status

@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { completeWorkOrder, setWorkOrderStatus } from "@/lib/actions";
-import { parseChecklist, parseResults } from "@/lib/checklist";
+import { completeWorkOrder, saveChecklistAnswer, setWorkOrderStatus } from "@/lib/actions";
+import { draftAnswers, parseChecklist, parseResults } from "@/lib/checklist";
 import { formatDate, formatNumber } from "@/lib/forms";
 import { userLabel } from "@/lib/queries";
 import { describeInterval } from "@/lib/schedule";
@@ -22,6 +22,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
   if (!wo) notFound();
   const due = workOrderDue(wo, wo.asset.currentMeter, wo.pmTask?.usageEvery ?? null);
   const complete = wo.status === "COMPLETE";
+  const checklist = parseChecklist(wo.checklist);
 
   const statusButton = (status: "OPEN" | "IN_PROGRESS" | "ON_HOLD", label: string, primary = false) => (
     <form action={setWorkOrderStatus.bind(null, wo.id, status)}>
@@ -113,7 +114,9 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
             <Card title="Complete this work order">
               <CompleteForm
                 action={completeWorkOrder.bind(null, wo.id)}
-                checklist={parseChecklist(wo.checklist)}
+                saveAnswer={saveChecklistAnswer.bind(null, wo.id)}
+                checklist={checklist}
+                drafts={draftAnswers(checklist, wo.checklistResults)}
                 meterUnit={wo.asset.meterUnit}
                 currentMeter={wo.asset.currentMeter}
                 meterRequired={wo.dueMeter != null}

@@ -22,6 +22,7 @@ export function CompleteForm({
   meterUnit,
   currentMeter,
   meterRequired,
+  assetDown = false,
 }: {
   action: Action;
   saveAnswer: SaveAnswer;
@@ -30,6 +31,8 @@ export function CompleteForm({
   meterUnit: string | null;
   currentMeter: number | null;
   meterRequired: boolean;
+  /** The asset has open downtime: offer to mark it back up. */
+  assetDown?: boolean;
 }) {
   const router = useRouter();
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
@@ -85,6 +88,12 @@ export function CompleteForm({
       <Field label="Notes">
         <textarea name="notes" rows={4} className="input" placeholder="What was done, parts used, issues found…" />
       </Field>
+      {assetDown && (
+        <label className="flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900 ring-1 ring-emerald-200">
+          <input type="checkbox" name="assetUp" defaultChecked className="size-4" />
+          The asset is back up and running (ends the downtime)
+        </label>
+      )}
       <SubmitButton>Mark complete</SubmitButton>
     </ActionForm>
   );

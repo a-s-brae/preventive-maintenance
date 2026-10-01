@@ -6,9 +6,24 @@ import type { Prisma } from "@prisma/client";
 import { requireUser } from "@/auth";
 import { db } from "@/lib/db";
 import { checklistFromForm, draftAnswers, NOTE_MAX, parseAnswer, parseChecklist, resultsFromForm, type ChecklistResult } from "@/lib/checklist";
-import { assetSchema, completeSchema, firstError, optNumber, taskSchema, workOrderSchema, type FormState } from "@/lib/forms";
+import { endDowntime, startDowntime } from "@/lib/downtime";
+import {
+  approveSchema,
+  assetSchema,
+  completeSchema,
+  downSchema,
+  firstError,
+  locationSchema,
+  optNumber,
+  rejectSchema,
+  requestSchema,
+  taskSchema,
+  workOrderSchema,
+  type FormState,
+} from "@/lib/forms";
 import { loadSampleData } from "@/lib/sample-data";
 import { nextFixedCycle } from "@/lib/schedule";
+import { wouldCycle } from "@/lib/tree";
 import { openPmWorkOrder, refreshOpenPmWorkOrder, syncPmWorkOrders } from "@/lib/work-orders";
 
 const fields = (fd: FormData) => Object.fromEntries(fd.entries());
@@ -23,7 +38,16 @@ export async function saveAsset(assetId: string | null, _prev: FormState, fd: Fo
   await requireUser();
   const parsed = assetSchema.safeParse(fields(fd));
   if (!parsed.success) return { error: firstError(parsed.error) };
-  const data = { ...parsed.data, assetTag: parsed.data.assetTag ?? null };
+  const data = {
+    ...parsed.data,
+    assetTag: parsed.data.assetTag ?? null,
+    locationId: parsed.data.locationId ?? null,
+    parentId: parsed.data.parentId ?? null,
+  };
+  if (assetId && data.parentId) {
+    const all = await db.asset.findMany({ select: { id: true, parentId: true, name: true } });
+    if (wouldCycle(all, assetId, data.parentId)) return { error: "An asset can't sit under itself or one of its own sub-assets" };
+  }
 
   let id: string;
   try {
@@ -128,7 +152,7 @@ export async function saveTask(
   });
   await syncPmWorkOrders(db);
   revalidatePath("/", "layout");
-  redirect(`/assets/${ids.assetId}`);
+  redirect(`/assets/${ids.assetId}?tab=pm`);
 }
 
 export async function deleteTask(taskId: string) {
@@ -140,7 +164,7 @@ export async function deleteTask(taskId: string) {
     return tx.pmTask.delete({ where: { id: taskId } });
   });
   revalidatePath("/", "layout");
-  redirect(`/assets/${task.assetId}`);
+  redirect(`/assets/${task.assetId}?tab=pm`);
 }
 
 /** Create a PM schedule's work order now, before it comes due. */
@@ -173,7 +197,11 @@ export async function saveWorkOrder(workOrderId: string | null, _prev: FormState
     const manual = existing.type === "PM" ? {} : { type: w.type, assetId: w.assetId };
     id = (await db.workOrder.update({ where: { id: workOrderId }, data: { ...data, ...manual } })).id;
   } else {
-    id = (await db.workOrder.create({ data: { ...data, type: w.type, assetId: w.assetId, createdById: user.id } })).id;
+    id = await db.$transaction(async (tx) => {
+      const wo = await tx.workOrder.create({ data: { ...data, type: w.type, assetId: w.assetId, createdById: user.id } });
+      if (w.assetDown) await startDowntime(tx, { assetId: w.assetId, userId: user.id, reason: w.title, workOrderId: wo.id });
+      return wo.id;
+    });
   }
   revalidatePath("/", "layout");
   redirect(`/work-orders/${id}`);
@@ -241,12 +269,14 @@ export async function completeWorkOrder(workOrderId: string, _prev: FormState, f
   const user = await requireUser();
   const parsed = completeSchema.safeParse(fields(fd));
   if (!parsed.success) return { error: firstError(parsed.error) };
-  const { performedAt, meterReading, notes } = parsed.data;
+  const { performedAt, meterReading, notes, assetUp } = parsed.data;
 
   try {
     await db.$transaction(async (tx) => {
       const wo = await tx.workOrder.findUniqueOrThrow({ where: { id: workOrderId } });
       if (wo.status === "COMPLETE") throw new FormError("This work order is already complete");
+      // Back up now if done today; a back-dated completion ends the downtime on that day.
+      if (assetUp) await endDowntime(tx, wo.assetId, user.id, isToday(performedAt) ? new Date() : performedAt);
 
       const { results, error } = resultsFromForm(parseChecklist(wo.checklist), fd);
       if (error) throw new FormError(error);
@@ -302,4 +332,142 @@ export async function deleteWorkOrder(workOrderId: string) {
   await db.workOrder.delete({ where: { id: workOrderId } });
   revalidatePath("/", "layout");
   redirect("/work-orders");
+}
+
+const isToday = (d: Date) => d.toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10);
+
+// ─── Locations ──────────────────────────────────────────────────────────────
+
+export async function saveLocation(locationId: string | null, _prev: FormState, fd: FormData): Promise<FormState> {
+  await requireUser();
+  const parsed = locationSchema.safeParse(fields(fd));
+  if (!parsed.success) return { error: firstError(parsed.error) };
+  const data = { name: parsed.data.name, parentId: parsed.data.parentId ?? null, notes: parsed.data.notes ?? null };
+  const all = await db.location.findMany({ select: { id: true, parentId: true, name: true } });
+  if (locationId && wouldCycle(all, locationId, data.parentId)) return { error: "A location can't sit inside itself or one of its own sub-locations" };
+  const sibling = all.find((l) => l.parentId === data.parentId && l.name.toLowerCase() === data.name.toLowerCase() && l.id !== locationId);
+  if (sibling) return { error: `There's already a "${sibling.name}" here` };
+
+  const id = locationId
+    ? (await db.location.update({ where: { id: locationId }, data })).id
+    : (await db.location.create({ data })).id;
+  revalidatePath("/", "layout");
+  redirect(`/locations/${id}`);
+}
+
+/** Delete an empty location. Ones with sub-locations or assets must be emptied first. */
+export async function deleteLocation(locationId: string, _prev: FormState, _fd: FormData): Promise<FormState> {
+  await requireUser();
+  const loc = await db.location.findUniqueOrThrow({ where: { id: locationId }, include: { _count: { select: { children: true, assets: true } } } });
+  if (loc._count.children || loc._count.assets) {
+    return { error: `Move its ${loc._count.children} sub-location(s) and ${loc._count.assets} asset(s) somewhere else first` };
+  }
+  await db.location.delete({ where: { id: locationId } });
+  revalidatePath("/", "layout");
+  redirect(loc.parentId ? `/locations/${loc.parentId}` : "/locations");
+}
+
+// ─── Downtime ───────────────────────────────────────────────────────────────
+
+export async function markAssetDown(assetId: string, _prev: FormState, fd: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const parsed = downSchema.safeParse(fields(fd));
+  if (!parsed.success) return { error: firstError(parsed.error) };
+  await startDowntime(db, { assetId, userId: user.id, reason: parsed.data.reason });
+  revalidatePath("/", "layout");
+  return {};
+}
+
+export async function markAssetUp(assetId: string) {
+  const user = await requireUser();
+  await endDowntime(db, assetId, user.id);
+  revalidatePath("/", "layout");
+}
+
+// ─── Requests ───────────────────────────────────────────────────────────────
+
+export async function createRequest(_prev: FormState, fd: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const parsed = requestSchema.safeParse(fields(fd));
+  if (!parsed.success) return { error: firstError(parsed.error) };
+  const r = parsed.data;
+  if (r.assetDown && !r.assetId) return { error: "Pick the machine that's down, so it can be logged as down" };
+
+  const request = await db.$transaction(async (tx) => {
+    const req = await tx.request.create({
+      data: {
+        title: r.title,
+        description: r.description ?? null,
+        assetId: r.assetId ?? null,
+        locationId: r.locationId ?? null,
+        priority: r.priority,
+        assetDown: r.assetDown,
+        requestedById: user.id,
+      },
+    });
+    // Downtime starts when it's reported, not when someone gets round to approving it.
+    if (r.assetDown && r.assetId) await startDowntime(tx, { assetId: r.assetId, userId: user.id, reason: r.title, requestId: req.id });
+    return req;
+  });
+  revalidatePath("/", "layout");
+  redirect(`/requests/${request.id}?submitted=1`);
+}
+
+/** Approve a request: create its work order and link any downtime to it. */
+export async function approveRequest(requestId: string, _prev: FormState, fd: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const parsed = approveSchema.safeParse(fields(fd));
+  if (!parsed.success) return { error: firstError(parsed.error) };
+  const a = parsed.data;
+
+  let workOrderId: string;
+  try {
+    workOrderId = await db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "Request" WHERE id = ${requestId} FOR UPDATE`;
+      const req = await tx.request.findUniqueOrThrow({ where: { id: requestId }, include: { requestedBy: true } });
+      if (req.status !== "PENDING") throw new FormError("This request has already been reviewed");
+      const by = req.requestedBy ? (req.requestedBy.name ?? req.requestedBy.email) : "someone";
+      const wo = await tx.workOrder.create({
+        data: {
+          type: "REPAIR",
+          title: req.title,
+          description: [req.description, `Requested by ${by}.`, a.note].filter(Boolean).join("\n\n"),
+          assetId: a.assetId,
+          priority: a.priority,
+          dueDate: a.dueDate ?? null,
+          assignedToId: a.assignedToId ?? null,
+          createdById: user.id,
+        },
+      });
+      await tx.request.update({
+        where: { id: req.id },
+        data: { status: "APPROVED", reviewedById: user.id, reviewedAt: new Date(), reviewNote: a.note ?? null, workOrderId: wo.id, assetId: a.assetId },
+      });
+      // Reported down: the downtime started at submission (or starts now, back-dated
+      // to the report, if no asset was picked then).
+      if (req.assetDown) {
+        await startDowntime(tx, { assetId: a.assetId, userId: req.requestedById, reason: req.title, workOrderId: wo.id, requestId: req.id, at: req.createdAt });
+      }
+      await tx.downtime.updateMany({ where: { requestId: req.id, workOrderId: null }, data: { workOrderId: wo.id } });
+      return wo.id;
+    });
+  } catch (e) {
+    if (e instanceof FormError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath("/", "layout");
+  redirect(`/work-orders/${workOrderId}`);
+}
+
+export async function rejectRequest(requestId: string, _prev: FormState, fd: FormData): Promise<FormState> {
+  const user = await requireUser();
+  const parsed = rejectSchema.safeParse(fields(fd));
+  if (!parsed.success) return { error: firstError(parsed.error) };
+  const { count } = await db.request.updateMany({
+    where: { id: requestId, status: "PENDING" },
+    data: { status: "REJECTED", reviewedById: user.id, reviewedAt: new Date(), reviewNote: parsed.data.note },
+  });
+  if (count === 0) return { error: "This request has already been reviewed" };
+  revalidatePath("/", "layout");
+  redirect(`/requests/${requestId}`);
 }

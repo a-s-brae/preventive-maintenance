@@ -2,15 +2,23 @@ import Link from "next/link";
 import { requireUser } from "@/auth";
 import { db } from "@/lib/db";
 import { loadSampleAssets } from "@/lib/actions";
-import { getAllOpenWorkOrders } from "@/lib/queries";
+import { downtimeHours, formatDuration, requestNumber } from "@/lib/downtime";
+import { getAllOpenWorkOrders, userLabel } from "@/lib/queries";
+import { woNumber } from "@/lib/work-orders";
 import { OpenWorkOrderList } from "@/components/work-order-table";
-import { ButtonLink, Card, PageHeader } from "@/components/ui";
+import { ButtonLink, Card, DownBadge, PageHeader, PriorityText } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
 export default async function Dashboard() {
   const user = await requireUser();
-  const [open, assetCount] = await Promise.all([getAllOpenWorkOrders(), db.asset.count()]);
+  const [open, assetCount, down, pendingRequests] = await Promise.all([
+    getAllOpenWorkOrders(),
+    db.asset.count(),
+    db.downtime.findMany({ where: { endedAt: null }, orderBy: { startedAt: "asc" }, include: { asset: true, workOrder: true } }),
+    db.request.findMany({ where: { status: "PENDING" }, orderBy: { createdAt: "asc" }, take: 5, include: { asset: true, requestedBy: true } }),
+  ]);
+  const now = new Date();
   const attention = open.filter((wo) => wo.due.status === "OVERDUE" || wo.due.status === "DUE_SOON");
   const mine = open.filter((wo) => wo.assignedToId === user.id);
 
@@ -45,6 +53,66 @@ export default async function Dashboard() {
         </div>
       ) : (
         <div className="space-y-6">
+          {down.length > 0 && (
+            <section className="rounded-lg border border-red-200 bg-red-50 p-4">
+              <h2 className="mb-2 flex items-center gap-2 font-medium text-red-900">
+                <DownBadge /> {down.length} asset{down.length === 1 ? " is" : "s are"} down
+              </h2>
+              <ul className="divide-y divide-red-100 text-sm">
+                {down.map((d) => (
+                  <li key={d.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                    <div>
+                      <Link href={`/assets/${d.assetId}`} className="font-medium text-red-900 hover:underline">
+                        {d.asset.name}
+                      </Link>
+                      {d.reason && <span className="text-red-800"> — {d.reason}</span>}
+                    </div>
+                    <div className="flex items-center gap-3 text-red-800">
+                      <span className="tabular-nums">down {formatDuration(downtimeHours([d], d.startedAt, now, now))}</span>
+                      {d.workOrder ? (
+                        <Link href={`/work-orders/${d.workOrder.id}`} className="link">
+                          {woNumber(d.workOrder.number)}
+                        </Link>
+                      ) : (
+                        <Link href={`/work-orders/new?assetId=${d.assetId}`} className="link">
+                          + Work order
+                        </Link>
+                      )}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {pendingRequests.length > 0 && (
+            <Card
+              title="Requests waiting for review"
+              actions={
+                <Link href="/requests" className="link text-sm">
+                  All requests →
+                </Link>
+              }
+            >
+              <ul className="divide-y divide-slate-100 text-sm">
+                {pendingRequests.map((r) => (
+                  <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                    <div>
+                      <Link href={`/requests/${r.id}`} className="link">
+                        {r.title}
+                      </Link>
+                      <div className="text-xs text-slate-500">
+                        {[requestNumber(r.number), r.asset?.name ?? "no equipment given", r.requestedBy && userLabel(r.requestedBy)].filter(Boolean).join(" · ")}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {r.assetDown && <DownBadge />}
+                      <PriorityText priority={r.priority} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          )}
           <Card
             title="Needs attention"
             actions={

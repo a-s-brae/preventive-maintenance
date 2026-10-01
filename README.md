@@ -22,6 +22,11 @@ computer (`npm run local`) or hosted on Vercel.
 | **Checklist autosave** | Each answer (and its optional note) is saved the moment it's entered, so a PM interrupted halfway keeps its answers. The first answer moves the work order to In progress. |
 | **Lists** | Filter chips for due / status / priority, search, and **Export CSV** on work orders, PM schedules and assets (the export matches the filters on screen). |
 | **Navigation** | Left sidebar with badges (overdue work orders, work assigned to you); a slide-out menu on phones and tablets. |
+| **Locations** | A tree (plant → area → line). Each location shows the equipment in it and below it, and its open work orders. Existing free-text locations were converted automatically. |
+| **Equipment tree** | Assets can sit under a parent (a dryer under its compressor). The asset list shows the tree, filters by location (including sub-locations) and by "down now". |
+| **Asset page** | Tabs: Overview (details, meter, sub-assets, open work) · Work orders · PM schedules · Downtime · Meter readings. |
+| **Downtime** | Mark an asset down / back up, tick "asset is down" on a new repair or request, and mark it back up when completing the work order. Totals for 7 / 30 / 90 days and a downtime log. Down assets show on the dashboard. |
+| **Requests** | Anyone can **Report a problem** (what's wrong, which equipment, how urgent, is it down). A reviewer approves it into a work order or rejects it with a reason. |
 | **Sign-in** | Email magic link, restricted to `ALLOWED_EMAIL_DOMAINS` (default `as-plastech.com`). In local mode, sign-in skips the email step. |
 
 The due-date rules ([`lib/schedule.ts`](lib/schedule.ts)), work order due status
@@ -139,8 +144,7 @@ Modeled on the layout of [Atlas CMMS](https://github.com/Grashjs/cmms) (ideas on
 is copied; Atlas is AGPL).
 
 1. ~~Work orders as the core, fixed schedules, typed checklists, calendar~~ ✅
-2. Plant structure: locations list, parent/child assets, asset status with downtime
-   logging, a request form so operators can report problems.
+2. ~~Plant structure: locations tree, parent/child assets, downtime logging, requests~~ ✅
 3. Parts used on work orders with min-stock alerts, labor time, photos, roles
    (admin / tech / requester), email for overdue work.
 4. Reports (PM compliance, MTBF / MTTR, cost per asset), QR labels on equipment,

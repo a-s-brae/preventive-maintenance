@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
-type Counts = { overdue: number; mine: number };
+type Counts = { overdue: number; mine: number; pendingRequests: number };
 
-type NavItem = { href: string; label: string; icon: keyof typeof ICONS; badge?: { count: number; tone: "red" | "blue"; title: string } };
+type NavItem = { href: string; label: string; icon: keyof typeof ICONS; badge?: { count: number; tone: "red" | "blue" | "amber"; title: string } };
 
 function navSections(counts: Counts): { title?: string; items: NavItem[] }[] {
   return [
@@ -16,16 +16,21 @@ function navSections(counts: Counts): { title?: string; items: NavItem[] }[] {
       items: [
         { href: "/work-orders", label: "Open", icon: "clipboard", badge: { count: counts.overdue, tone: "red", title: "overdue" } },
         { href: "/work-orders?view=mine", label: "Assigned to me", icon: "user", badge: { count: counts.mine, tone: "blue", title: "open, assigned to you" } },
+        { href: "/requests", label: "Requests", icon: "inbox", badge: { count: counts.pendingRequests, tone: "amber", title: "waiting for review" } },
         { href: "/work-orders/calendar", label: "Calendar", icon: "calendar" },
         { href: "/history", label: "History", icon: "clock" },
       ],
     },
     {
-      title: "Planning",
+      title: "Equipment",
       items: [
-        { href: "/pm", label: "PM schedules", icon: "repeat" },
         { href: "/assets", label: "Assets", icon: "cube" },
+        { href: "/locations", label: "Locations", icon: "pin" },
       ],
+    },
+    {
+      title: "Planning",
+      items: [{ href: "/pm", label: "PM schedules", icon: "repeat" }],
     },
   ];
 }
@@ -60,6 +65,12 @@ export function AppShell({
         <span className="flex size-7 items-center justify-center rounded-md bg-sky-600 text-xs font-bold">PM</span>
         PM System
       </Link>
+      <div className="px-3 pb-4">
+        <Link href="/requests/new" className="flex items-center justify-center gap-2 rounded-md bg-amber-500 px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-amber-400">
+          <Icon name="alert" />
+          Report a problem
+        </Link>
+      </div>
       <Suspense fallback={<Nav counts={counts} />}>
         <ActiveNav counts={counts} />
       </Suspense>
@@ -150,7 +161,9 @@ function Nav({ counts, isActive = () => false }: { counts: Counts; isActive?: (h
                     {item.badge && item.badge.count > 0 && (
                       <span
                         title={`${item.badge.count} ${item.badge.title}`}
-                        className={`min-w-5 rounded-full px-1.5 text-center text-xs leading-5 font-medium text-white ${item.badge.tone === "red" ? "bg-red-600" : "bg-sky-600"}`}
+                        className={`min-w-5 rounded-full px-1.5 text-center text-xs leading-5 font-medium ${
+                          item.badge.tone === "red" ? "bg-red-600 text-white" : item.badge.tone === "amber" ? "bg-amber-400 text-slate-900" : "bg-sky-600 text-white"
+                        }`}
                       >
                         {item.badge.count}
                       </span>
@@ -175,6 +188,9 @@ const ICONS = {
   clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18m0-13v5l3 2",
   repeat: "M4 12a8 8 0 0 1 13.7-5.6L20 9M20 4v5h-5m5 3a8 8 0 0 1-13.7 5.6L4 15m0 5v-5h5",
   cube: "m12 3 8 4.5v9L12 21l-8-4.5v-9zm0 0v18m8-13.5-8 4.5-8-4.5",
+  inbox: "M4 13h4l2 3h4l2-3h4M4 13l2-8h12l2 8v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z",
+  pin: "M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12m0-9a3 3 0 1 0 0-6 3 3 0 0 0 0 6",
+  alert: "M12 9v4m0 4h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0",
   menu: "M4 6h16M4 12h16M4 18h16",
   close: "M6 6l12 12M18 6 6 18",
 } as const;

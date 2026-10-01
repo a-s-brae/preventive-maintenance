@@ -17,6 +17,27 @@ const STATUS_LABEL: Record<DueStatus, string> = {
   NO_SCHEDULE: "No schedule",
 };
 
+const REQUEST_STATUS: Record<"PENDING" | "APPROVED" | "REJECTED", [string, string]> = {
+  PENDING: ["Waiting for review", "bg-amber-100 text-amber-800 ring-amber-200"],
+  APPROVED: ["Approved", "bg-emerald-100 text-emerald-800 ring-emerald-200"],
+  REJECTED: ["Rejected", "bg-slate-200 text-slate-700 ring-slate-300"],
+};
+
+export function RequestStatusBadge({ status }: { status: "PENDING" | "APPROVED" | "REJECTED" }) {
+  const [label, style] = REQUEST_STATUS[status];
+  return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset ${style}`}>{label}</span>;
+}
+
+/** Red "Down" pill for equipment with open downtime. */
+export function DownBadge({ since }: { since?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-xs font-medium whitespace-nowrap text-white">
+      <span className="size-1.5 rounded-full bg-white" aria-hidden="true" />
+      Down{since ? ` · ${since}` : ""}
+    </span>
+  );
+}
+
 export function StatusBadge({ status }: { status: DueStatus }) {
   return (
     <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset ${STATUS_STYLE[status]}`}>

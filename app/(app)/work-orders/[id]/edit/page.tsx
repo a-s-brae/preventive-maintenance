@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { deleteWorkOrder, saveWorkOrder } from "@/lib/actions";
-import { getUsers } from "@/lib/queries";
+import { getAssetTree, getUsers } from "@/lib/queries";
 import { woNumber } from "@/lib/work-orders";
 import { ConfirmButton } from "@/components/form";
 import { WorkOrderForm } from "@/components/work-order-form";
@@ -11,7 +11,7 @@ export default async function EditWorkOrderPage({ params }: { params: Promise<{ 
   const { id } = await params;
   const [workOrder, assets, users] = await Promise.all([
     db.workOrder.findUnique({ where: { id } }),
-    db.asset.findMany({ where: { status: { not: "RETIRED" } }, orderBy: { name: "asc" }, select: { id: true, name: true, assetTag: true } }),
+    getAssetTree(),
     getUsers(),
   ]);
   if (!workOrder) notFound();

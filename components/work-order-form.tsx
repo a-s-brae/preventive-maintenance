@@ -17,7 +17,7 @@ export function WorkOrderForm({
 }: {
   action: Action;
   workOrder?: WorkOrder;
-  assets: Pick<Asset, "id" | "name" | "assetTag">[];
+  assets: (Pick<Asset, "id" | "name" | "assetTag"> & { depth?: number })[];
   users: UserOption[];
   defaultAssetId?: string;
 }) {
@@ -45,6 +45,8 @@ export function WorkOrderForm({
                 </option>
                 {assets.map((a) => (
                   <option key={a.id} value={a.id}>
+                    {"\u00a0\u00a0\u00a0".repeat(a.depth ?? 0)}
+                    {a.depth ? "└ " : ""}
                     {a.name}
                     {a.assetTag ? ` (${a.assetTag})` : ""}
                   </option>
@@ -83,6 +85,12 @@ export function WorkOrderForm({
           </select>
         </Field>
       </div>
+      {!workOrder && (
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" name="assetDown" className="size-4" />
+          The asset is <strong className="font-medium text-red-700">down</strong> right now (starts logging downtime)
+        </label>
+      )}
       <SubmitButton>{workOrder ? "Save changes" : "Create work order"}</SubmitButton>
     </ActionForm>
   );

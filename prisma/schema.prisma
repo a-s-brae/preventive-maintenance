@@ -51,6 +51,29 @@ enum ScheduleBasis {
   FIXED // on a fixed calendar (e.g. the 1st of every month), however late it was done
 }
 
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+/// Where equipment lives, as a tree: plant → area → line …
+model Location {
+  id        String     @id @default(cuid())
+  name      String
+  parentId  String?
+  parent    Location?  @relation("LocationTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children  Location[] @relation("LocationTree")
+  notes     String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  assets   Asset[]
+  requests Request[]
+
+  @@index([parentId])
+}
+
 /// A piece of equipment. Deliberately generic (compressor, forklift, HVAC,
 /// press, …) so the system can grow from facility gear into production.
 model Asset {
@@ -58,7 +81,12 @@ model Asset {
   name           String
   assetTag       String?     @unique
   category       String?
-  location       String?
+  locationId     String?
+  location       Location?   @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  /// Parent equipment, e.g. the press a dryer belongs to.
+  parentId       String?
+  parent         Asset?      @relation("AssetTree", fields: [parentId], references: [id], onDelete: SetNull)
+  children       Asset[]     @relation("AssetTree")
   manufacturer   String?
   model          String?
   serialNumber   String?
@@ -74,8 +102,68 @@ model Asset {
   tasks      PmTask[]
   workOrders WorkOrder[]
   readings   MeterReading[]
+  downtimes  Downtime[]
+  requests   Request[]
 
   @@index([status])
+  @@index([locationId])
+  @@index([parentId])
+}
+
+/// A period when an asset was down. Open (no endedAt) while it's still down.
+model Downtime {
+  id             String     @id @default(cuid())
+  assetId        String
+  asset          Asset      @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  /// Set to assetId while open, so an asset can only have one open downtime.
+  openForAssetId String?    @unique
+  startedAt      DateTime
+  endedAt        DateTime?
+  reason         String?
+  workOrderId    String?
+  workOrder      WorkOrder? @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
+  requestId      String?
+  request        Request?   @relation(fields: [requestId], references: [id], onDelete: SetNull)
+  startedById    String?
+  startedBy      User?      @relation("DowntimeStarter", fields: [startedById], references: [id], onDelete: SetNull)
+  endedById      String?
+  endedBy        User?      @relation("DowntimeEnder", fields: [endedById], references: [id], onDelete: SetNull)
+  createdAt      DateTime   @default(now())
+
+  @@index([assetId, startedAt])
+  @@index([workOrderId])
+}
+
+/// A problem reported by anyone. A reviewer approves it into a work order or rejects it.
+model Request {
+  id            String        @id @default(cuid())
+  /// Shown as REQ-0001.
+  number        Int           @unique @default(autoincrement())
+  title         String
+  description   String?
+  assetId       String?
+  asset         Asset?        @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  locationId    String?
+  location      Location?     @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  priority      Priority      @default(NONE)
+  /// The requester reported the equipment as down.
+  assetDown     Boolean       @default(false)
+  status        RequestStatus @default(PENDING)
+  requestedById String?
+  requestedBy   User?         @relation("RequestRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+  reviewedById  String?
+  reviewedBy    User?         @relation("RequestReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  reviewedAt    DateTime?
+  /// Why it was rejected (or a note on approval).
+  reviewNote    String?
+  workOrderId   String?       @unique
+  workOrder     WorkOrder?    @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  downtimes Downtime[]
+
+  @@index([status, createdAt])
 }
 
 /// A recurring PM schedule on one asset. When it comes due it creates a work
@@ -153,6 +241,9 @@ model WorkOrder {
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
+  request   Request?
+  downtimes Downtime[]
+
   @@index([status, dueDate])
   @@index([assetId, completedAt])
   @@index([pmTaskId])
@@ -190,6 +281,10 @@ model User {
   createdWorkOrders   WorkOrder[] @relation("WorkOrderCreator")
   completedWorkOrders WorkOrder[] @relation("WorkOrderCompleter")
   defaultForPmTasks   PmTask[]    @relation("PmDefaultAssignee")
+  requests            Request[]   @relation("RequestRequester")
+  reviewedRequests    Request[]   @relation("RequestReviewer")
+  startedDowntimes    Downtime[]  @relation("DowntimeStarter")
+  endedDowntimes      Downtime[]  @relation("DowntimeEnder")
 }
 
 model Account {

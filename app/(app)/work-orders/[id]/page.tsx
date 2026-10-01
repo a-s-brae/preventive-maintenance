@@ -7,6 +7,7 @@ import { formatDate, formatNumber } from "@/lib/forms";
 import { userLabel } from "@/lib/queries";
 import { describeInterval } from "@/lib/schedule";
 import { TYPE_LABEL, woNumber, workOrderDue } from "@/lib/work-orders";
+import { formatDateTime, requestNumber } from "@/lib/downtime";
 import { ChecklistResults } from "@/components/checklist-results";
 import { CompleteForm } from "@/components/complete-form";
 import { ButtonLink, Card, PriorityText, StatusBadge, WoDueText, WoStatusBadge } from "@/components/ui";
@@ -17,12 +18,20 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const wo = await db.workOrder.findUnique({
     where: { id },
-    include: { asset: true, pmTask: true, assignedTo: true, createdBy: true, completedBy: true },
+    include: {
+      asset: { include: { location: true, downtimes: { where: { endedAt: null }, take: 1 } } },
+      pmTask: true,
+      assignedTo: true,
+      createdBy: true,
+      completedBy: true,
+      request: { include: { requestedBy: true } },
+    },
   });
   if (!wo) notFound();
   const due = workOrderDue(wo, wo.asset.currentMeter, wo.pmTask?.usageEvery ?? null);
   const complete = wo.status === "COMPLETE";
   const checklist = parseChecklist(wo.checklist);
+  const openDowntime = wo.asset.downtimes[0];
 
   const statusButton = (status: "OPEN" | "IN_PROGRESS" | "ON_HOLD", label: string, primary = false) => (
     <form action={setWorkOrderStatus.bind(null, wo.id, status)}>
@@ -39,7 +48,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
         {wo.asset.name}
       </Link>,
     ],
-    ["Location", wo.asset.location ?? "—"],
+    ["Location", wo.asset.location?.name ?? "—"],
     ["Type", TYPE_LABEL[wo.type]],
     ["Priority", <PriorityText key="p" priority={wo.priority} />],
     ["Assigned to", userLabel(wo.assignedTo)],
@@ -65,6 +74,17 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
         ] as [string, React.ReactNode][])
       : []),
     ...(wo.pmTask?.estimatedMinutes ? ([["Estimated time", `${wo.pmTask.estimatedMinutes} min`]] as [string, React.ReactNode][]) : []),
+    ...(wo.request
+      ? ([
+          [
+            "From request",
+            <Link key="req" href={`/requests/${wo.request.id}`} className="link">
+              {requestNumber(wo.request.number)}
+              {wo.request.requestedBy ? ` by ${userLabel(wo.request.requestedBy)}` : ""}
+            </Link>,
+          ],
+        ] as [string, React.ReactNode][])
+      : []),
     ["Created", `${formatDate(wo.createdAt)}${wo.createdBy ? ` by ${userLabel(wo.createdBy)}` : wo.type === "PM" ? " by PM schedule" : ""}`],
     ...(wo.startedAt ? ([["Started", formatDate(wo.startedAt)]] as [string, React.ReactNode][]) : []),
     ...(complete ? ([["Completed", `${formatDate(wo.completedAt)} by ${userLabel(wo.completedBy)}`]] as [string, React.ReactNode][]) : []),
@@ -91,6 +111,13 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
           )}
         </div>
       </div>
+
+      {openDowntime && !complete && (
+        <div className="mb-5 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-800 ring-1 ring-red-200">
+          <strong>{wo.asset.name} is down</strong> since {formatDateTime(openDowntime.startedAt)}
+          {openDowntime.reason ? ` — ${openDowntime.reason}` : ""}. Completing this work order can mark it back up.
+        </div>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
@@ -120,6 +147,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                 meterUnit={wo.asset.meterUnit}
                 currentMeter={wo.asset.currentMeter}
                 meterRequired={wo.dueMeter != null}
+                assetDown={!!openDowntime}
               />
             </Card>
           )}

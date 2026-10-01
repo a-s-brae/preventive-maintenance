@@ -69,7 +69,7 @@ export function OpenWorkOrderList({ rows, showAsset = true, empty }: { rows: Wor
                     <Link href={`/assets/${wo.asset.id}`} className="link">
                       {wo.asset.name}
                     </Link>
-                    <div className="text-xs text-slate-500">{wo.asset.location}</div>
+                    <div className="text-xs text-slate-500">{wo.asset.location?.name}</div>
                   </td>
                 )}
                 <td>

@@ -2,6 +2,7 @@ import { cache } from "react";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { compareDue, computeDue } from "@/lib/schedule";
+import { flattenTree } from "@/lib/tree";
 import { OPEN_STATUSES, syncPmWorkOrders, workOrderDue } from "@/lib/work-orders";
 
 /** Create due PM work orders at most once per page render, however many
@@ -12,7 +13,7 @@ const PRIORITY_RANK = { HIGH: 0, MEDIUM: 1, LOW: 2, NONE: 3 } as const;
 const DUE_RANK = { OVERDUE: 0, DUE_SOON: 1, OK: 2, NO_SCHEDULE: 3 } as const;
 
 export const workOrderInclude = {
-  asset: true,
+  asset: { include: { location: true } },
   assignedTo: true,
   completedBy: true,
   pmTask: { select: { usageEvery: true } },
@@ -48,12 +49,29 @@ export const getAllOpenWorkOrders = cache(() => getOpenWorkOrders());
 
 /** Counts for the sidebar badges. */
 export async function getNavCounts(userId: string) {
-  const open = await getAllOpenWorkOrders();
+  const [open, pendingRequests] = await Promise.all([getAllOpenWorkOrders(), db.request.count({ where: { status: "PENDING" } })]);
   return {
     overdue: open.filter((wo) => wo.due.status === "OVERDUE").length,
     mine: open.filter((wo) => wo.assignedToId === userId).length,
+    pendingRequests,
   };
 }
+
+/** All locations as a tree (depth-first, with each one's path). */
+export const getLocationTree = cache(async () => flattenTree(await db.location.findMany({ orderBy: { name: "asc" } })));
+
+/** Assets as a tree, for pickers. Retired assets are left out unless asked for. */
+export const getAssetTree = cache(async (includeRetired: boolean = false) =>
+  flattenTree(
+    await db.asset.findMany({
+      where: includeRetired ? {} : { status: { not: "RETIRED" } },
+      select: { id: true, name: true, parentId: true, assetTag: true, status: true, locationId: true },
+    }),
+  ),
+);
+
+export type LocationOption = Awaited<ReturnType<typeof getLocationTree>>[number];
+export type AssetOption = Awaited<ReturnType<typeof getAssetTree>>[number];
 
 /** PM schedules with due info and their open work order, most urgent first. */
 export async function getPmSchedules(where: Prisma.PmTaskWhereInput = {}) {
@@ -61,7 +79,7 @@ export async function getPmSchedules(where: Prisma.PmTaskWhereInput = {}) {
   const tasks = await db.pmTask.findMany({
     where,
     include: {
-      asset: true,
+      asset: { include: { location: true } },
       defaultAssignee: true,
       workOrders: { where: { status: { in: [...OPEN_STATUSES] } }, take: 1 },
     },

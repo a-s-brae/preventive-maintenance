@@ -40,7 +40,8 @@ export const assetSchema = z.object({
   name: reqText,
   assetTag: optText,
   category: optText,
-  location: optText,
+  locationId: optText,
+  parentId: optText,
   manufacturer: optText,
   model: optText,
   serialNumber: optText,
@@ -87,10 +88,42 @@ export const workOrderSchema = z.object({
   priority,
   dueDate: optDate,
   assignedToId: optText,
+  assetDown: z.preprocess((v) => v === "on", z.boolean()),
 });
+
+export const locationSchema = z.object({
+  name: reqText,
+  parentId: optText,
+  notes: optText,
+});
+
+/** Reporting a problem. Asset and location are both optional — the reviewer can fill them in. */
+export const requestSchema = z.object({
+  title: reqText,
+  description: optText,
+  assetId: optText,
+  locationId: optText,
+  priority,
+  assetDown: z.preprocess((v) => v === "on", z.boolean()),
+});
+
+export const approveSchema = z.object({
+  assetId: z.string().min(1, "Pick the asset this work is on"),
+  priority,
+  dueDate: optDate,
+  assignedToId: optText,
+  note: optText,
+});
+
+export const rejectSchema = z.object({
+  note: z.string().trim().min(1, "Say why it's rejected, so the requester knows").max(2000),
+});
+
+export const downSchema = z.object({ reason: optText });
 
 export const completeSchema = z.object({
   performedAt: dateOnly,
   meterReading: optNumber,
   notes: optText,
+  assetUp: z.preprocess((v) => v === "on", z.boolean()),
 });

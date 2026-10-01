@@ -23,12 +23,20 @@ const text = (label: string): ChecklistItem => ({ label, type: "TEXT" });
 export async function loadSampleData(tx: Prisma.TransactionClient): Promise<boolean> {
   if ((await tx.asset.count()) > 0) return false;
 
-  await tx.asset.create({
+  const loc = async (name: string, parentId?: string) =>
+    (await tx.location.findFirst({ where: { name, parentId: parentId ?? null } })) ?? (await tx.location.create({ data: { name, parentId } }));
+  const plant = await loc("Main plant");
+  const compressorRoom = await loc("Compressor room", plant.id);
+  const warehouse = await loc("Warehouse", plant.id);
+  const plantFloor = await loc("Plant floor", plant.id);
+  const office = await loc("Office");
+
+  const compressor = await tx.asset.create({
     data: {
       name: "Air Compressor #1",
       assetTag: "AC-001",
       category: "Compressed air",
-      location: "Compressor room",
+      locationId: compressorRoom.id,
       meterUnit: "hours",
       currentMeter: 12_480,
       meterUpdatedAt: new Date(),
@@ -64,10 +72,31 @@ export async function loadSampleData(tx: Prisma.TransactionClient): Promise<bool
 
   await tx.asset.create({
     data: {
+      name: "Refrigerated Air Dryer",
+      assetTag: "AD-001",
+      category: "Compressed air",
+      locationId: compressorRoom.id,
+      parentId: compressor.id,
+      tasks: {
+        create: [
+          {
+            title: "Clean condenser & check dew point",
+            calendarEvery: 3,
+            calendarUnit: "MONTH",
+            startDate: day(40),
+            checklist: [check("Blow out condenser coil"), number("Dew point", "°F"), passFail("Drain trap working")],
+          },
+        ],
+      },
+    },
+  });
+
+  await tx.asset.create({
+    data: {
       name: "Forklift — Toyota 8FGU25",
       assetTag: "FL-002",
       category: "Material handling",
-      location: "Warehouse",
+      locationId: warehouse.id,
       meterUnit: "hours",
       currentMeter: 5_210,
       meterUpdatedAt: new Date(),
@@ -105,7 +134,7 @@ export async function loadSampleData(tx: Prisma.TransactionClient): Promise<bool
       name: "Rooftop HVAC Unit — Office",
       assetTag: "HVAC-01",
       category: "HVAC",
-      location: "Roof, office side",
+      locationId: office.id,
       tasks: {
         create: [
           {
@@ -124,7 +153,7 @@ export async function loadSampleData(tx: Prisma.TransactionClient): Promise<bool
     data: {
       name: "Fire Extinguishers — Plant",
       category: "Safety",
-      location: "Plant floor",
+      locationId: plantFloor.id,
       tasks: {
         create: [
           {
@@ -137,6 +166,16 @@ export async function loadSampleData(tx: Prisma.TransactionClient): Promise<bool
           },
         ],
       },
+    },
+  });
+
+  const dryer = await tx.asset.findFirstOrThrow({ where: { assetTag: "AD-001" } });
+  await tx.request.create({
+    data: {
+      title: "Hissing air leak at the dryer inlet",
+      description: "Loud hiss near the inlet fitting since this morning. Dryer is still running.",
+      assetId: dryer.id,
+      priority: "MEDIUM",
     },
   });
 

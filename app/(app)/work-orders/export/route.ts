@@ -24,7 +24,7 @@ export async function GET(req: Request) {
         PRIORITY_LABEL[wo.priority],
         wo.asset.name,
         wo.asset.assetTag,
-        wo.asset.location,
+        wo.asset.location?.name,
         wo.assignedTo ? userLabel(wo.assignedTo) : "",
         csvDate(wo.dueDate),
         wo.dueMeter,

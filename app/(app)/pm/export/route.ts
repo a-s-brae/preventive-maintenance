@@ -17,7 +17,7 @@ export async function GET() {
       task.title,
       task.asset.name,
       task.asset.assetTag,
-      task.asset.location,
+      task.asset.location?.name,
       describeInterval(task, task.asset.meterUnit),
       due && task.asset.status === "ACTIVE" ? STATUS[due.status] : "Paused",
       csvDate(due?.nextDueAt),

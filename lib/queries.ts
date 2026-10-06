@@ -2,6 +2,7 @@ import { cache } from "react";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { compareDue, computeDue } from "@/lib/schedule";
+import { parseChecklist } from "@/lib/checklist";
 import { stockStatus } from "@/lib/parts";
 import { flattenTree } from "@/lib/tree";
 import { OPEN_STATUSES, syncPmWorkOrders, workOrderDue } from "@/lib/work-orders";
@@ -50,7 +51,8 @@ export const getAllOpenWorkOrders = cache(() => getOpenWorkOrders());
 
 /** Counts for the sidebar badges. */
 export async function getNavCounts(userId: string, staff: boolean) {
-  if (!staff) return { overdue: 0, mine: 0, pendingRequests: 0, lowStock: 0 };
+  const unread = await db.notification.count({ where: { userId, readAt: null } });
+  if (!staff) return { overdue: 0, mine: 0, pendingRequests: 0, lowStock: 0, unread };
   const [open, pendingRequests, parts] = await Promise.all([
     getAllOpenWorkOrders(),
     db.request.count({ where: { status: "PENDING" } }),
@@ -61,6 +63,7 @@ export async function getNavCounts(userId: string, staff: boolean) {
     mine: open.filter((wo) => wo.assignedToId === userId).length,
     pendingRequests,
     lowStock: parts.filter((p) => stockStatus(p) !== "OK").length,
+    unread,
   };
 }
 
@@ -99,6 +102,12 @@ export async function getPmSchedules(where: Prisma.PmTaskWhereInput = {}) {
       due: task.active ? computeDue(task, task.asset.currentMeter, now) : null,
     }))
     .sort((a, b) => (a.due && b.due ? compareDue(a.due, b.due) : a.due ? -1 : b.due ? 1 : 0));
+}
+
+/** Checklist templates for pickers, with their items parsed. */
+export async function getChecklistTemplates() {
+  const rows = await db.checklistTemplate.findMany({ orderBy: { name: "asc" } });
+  return rows.map((t) => ({ id: t.id, name: t.name, items: parseChecklist(t.items) }));
 }
 
 export function getUsers() {

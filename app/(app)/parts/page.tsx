@@ -34,6 +34,11 @@ export default async function PartsPage({ searchParams }: { searchParams: Promis
         <a href="/parts/export" className="btn-secondary" download>
           Export CSV
         </a>
+        {can(me.role, "manage") && (
+          <ButtonLink href="/parts/import" variant="secondary">
+            Import
+          </ButtonLink>
+        )}
         {can(me.role, "manage") && <ButtonLink href="/parts/new">+ Part</ButtonLink>}
       </PageHeader>
       <form className="mb-3 flex flex-wrap items-center gap-2">

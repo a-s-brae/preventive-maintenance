@@ -158,3 +158,8 @@ export const laborSchema = z
   })
   .refine((l) => (l.hours ?? 0) * 60 + (l.minutes ?? 0) > 0, { message: "Enter the time spent", path: ["minutes"] })
   .transform((l) => ({ ...l, total: (l.hours ?? 0) * 60 + (l.minutes ?? 0) }));
+
+export const templateSchema = z.object({
+  name: z.string().trim().min(1, "Give the template a name").max(100),
+  description: optText,
+});

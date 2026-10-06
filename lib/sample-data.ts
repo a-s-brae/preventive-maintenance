@@ -1,7 +1,7 @@
 // Sample equipment with typical PM schedules, for trying the system out.
 // Used by the "Load sample equipment" button and by `npm run db:seed`.
 import type { Prisma } from "@prisma/client";
-import type { ChecklistItem } from "@/lib/checklist";
+import { parseChecklist, type ChecklistItem } from "@/lib/checklist";
 
 const DAY = 86_400_000;
 /** A date n days from today (negative = past), at 12:00 UTC like date inputs. */
@@ -91,6 +91,20 @@ export async function loadSampleData(tx: Prisma.TransactionClient): Promise<bool
     },
   });
 
+  // One inspection checklist for every forklift.
+  const forkliftChecks = [
+    passFail("Tires & forks"),
+    passFail("Horn, lights, backup alarm"),
+    passFail("Brakes & parking brake"),
+    passFail("No fluid leaks"),
+    passFail("Seat belt"),
+  ];
+  const forkliftTemplate =
+    (await tx.checklistTemplate.findUnique({ where: { name: "Forklift pre-shift inspection" } })) ??
+    (await tx.checklistTemplate.create({
+      data: { name: "Forklift pre-shift inspection", description: "OSHA daily check before each shift", items: forkliftChecks },
+    }));
+
   await tx.asset.create({
     data: {
       name: "Forklift — Toyota 8FGU25",
@@ -109,13 +123,8 @@ export async function loadSampleData(tx: Prisma.TransactionClient): Promise<bool
             dueSoonDays: 0,
             startDate: day(0),
             priority: "HIGH",
-            checklist: [
-              passFail("Tires & forks"),
-              passFail("Horn, lights, backup alarm"),
-              passFail("Brakes & parking brake"),
-              passFail("No fluid leaks"),
-              passFail("Seat belt"),
-            ],
+            checklist: parseChecklist(forkliftTemplate.items),
+            checklistTemplateId: forkliftTemplate.id,
           },
           {
             title: "250-hour service",

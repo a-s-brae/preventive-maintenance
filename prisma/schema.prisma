@@ -170,38 +170,42 @@ model Request {
 /// A recurring PM schedule on one asset. When it comes due it creates a work
 /// order. Due by calendar, by usage, or both (whichever comes first).
 model PmTask {
-  id                String        @id @default(cuid())
-  assetId           String
-  asset             Asset         @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  title             String
-  instructions      String?
+  id                  String             @id @default(cuid())
+  assetId             String
+  asset               Asset              @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  title               String
+  instructions        String?
   /// ChecklistItem[] — see lib/checklist.ts
-  checklist         Json          @default("[]")
-  calendarEvery     Int?
-  calendarUnit      IntervalUnit?
-  usageEvery        Float?
-  scheduleBasis     ScheduleBasis @default(COMPLETION)
+  checklist           Json               @default("[]")
+  /// When set, the checklist is a copy of this template's and is kept in step with it.
+  checklistTemplateId String?
+  checklistTemplate   ChecklistTemplate? @relation(fields: [checklistTemplateId], references: [id], onDelete: SetNull)
+  calendarEvery       Int?
+  calendarUnit        IntervalUnit?
+  usageEvery          Float?
+  scheduleBasis       ScheduleBasis      @default(COMPLETION)
   /// First calendar due date.
-  startDate         DateTime
+  startDate           DateTime
   /// Meter baseline until the task is first completed.
-  startMeter        Float?
-  lastDoneAt        DateTime?
-  lastDoneMeter     Float?
+  startMeter          Float?
+  lastDoneAt          DateTime?
+  lastDoneMeter       Float?
   /// FIXED schedules: index of the next occurrence (startDate + n × interval).
-  fixedCycle        Int           @default(0)
+  fixedCycle          Int                @default(0)
   /// Days before the calendar due date that the work order is created.
-  dueSoonDays       Int           @default(7)
-  estimatedMinutes  Int?
-  priority          Priority      @default(NONE)
-  defaultAssigneeId String?
-  defaultAssignee   User?         @relation("PmDefaultAssignee", fields: [defaultAssigneeId], references: [id], onDelete: SetNull)
-  active            Boolean       @default(true)
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  dueSoonDays         Int                @default(7)
+  estimatedMinutes    Int?
+  priority            Priority           @default(NONE)
+  defaultAssigneeId   String?
+  defaultAssignee     User?              @relation("PmDefaultAssignee", fields: [defaultAssigneeId], references: [id], onDelete: SetNull)
+  active              Boolean            @default(true)
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
 
   workOrders WorkOrder[]
 
   @@index([assetId])
+  @@index([checklistTemplateId])
 }
 
 model WorkOrder {
@@ -424,6 +428,7 @@ model User {
   stockTransactions   StockTransaction[]
   labor               LaborEntry[]
   attachments         Attachment[]
+  notifications       Notification[]
 }
 
 model Account {
@@ -462,4 +467,35 @@ model VerificationToken {
   expires    DateTime
 
   @@id([identifier, token])
+}
+
+// ─── Checklist templates, notifications ──────────────────────────────────────
+
+/// A reusable checklist, e.g. one forklift inspection used by every forklift.
+model ChecklistTemplate {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  /// ChecklistItem[] — see lib/checklist.ts
+  items       Json     @default("[]")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tasks PmTask[]
+}
+
+/// An in-app notice for one person (the bell).
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  body      String?
+  /// Page it opens, e.g. /work-orders/<id>.
+  href      String
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId, readAt])
+  @@index([userId, createdAt])
 }

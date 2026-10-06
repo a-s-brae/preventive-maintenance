@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
-import { requirePermission } from "@/auth";
+import { requirePermission, requireUser } from "@/auth";
 import { db } from "@/lib/db";
 import { checklistFromForm, draftAnswers, findProblems, NOTE_MAX, parseAnswer, parseChecklist, resultsFromForm, type ChecklistResult } from "@/lib/checklist";
 import { endDowntime, startDowntime } from "@/lib/downtime";
@@ -28,13 +28,18 @@ import {
   rejectSchema,
   requestSchema,
   taskSchema,
+  templateSchema,
   workOrderSchema,
   type FormState,
 } from "@/lib/forms";
+import { MAX_IMPORT_BYTES, missingLocations, parseCsv, planAssetImport, planPartImport, summarizePlan } from "@/lib/csv-import";
+import { runAssetImport, runPartImport } from "@/lib/import-run";
+import { adminIds, notify } from "@/lib/notify";
 import { loadSampleData } from "@/lib/sample-data";
 import { nextFixedCycle } from "@/lib/schedule";
 import { wouldCycle } from "@/lib/tree";
-import { followUpFor, openPmWorkOrder, refreshOpenPmWorkOrder, syncPmWorkOrders } from "@/lib/work-orders";
+import { followUpFor, openPmWorkOrder, refreshOpenPmWorkOrder, syncPmWorkOrders, woNumber } from "@/lib/work-orders";
+import { requestNumber } from "@/lib/downtime";
 
 const fields = (fd: FormData) => Object.fromEntries(fd.entries());
 
@@ -130,13 +135,18 @@ export async function saveTask(
   await requirePermission("manage");
   const parsed = taskSchema.safeParse(fields(fd));
   if (!parsed.success) return { error: firstError(parsed.error) };
-  const checklist = checklistFromForm(fd.get("checklist"));
+  // A PM that uses a template takes the template's checklist as it is now.
+  const templateId = String(fd.get("checklistTemplateId") ?? "");
+  const template = templateId ? await db.checklistTemplate.findUnique({ where: { id: templateId } }) : null;
+  if (templateId && !template) return { error: "That checklist template no longer exists — pick another" };
+  const checklist = template ? parseChecklist(template.items) : checklistFromForm(fd.get("checklist"));
   if (!checklist) return { error: "The checklist couldn't be read — please try again" };
   const t = parsed.data;
   const data = {
     title: t.title,
     instructions: t.instructions ?? null,
     checklist,
+    checklistTemplateId: template?.id ?? null,
     calendarEvery: t.calendarEvery ?? null,
     calendarUnit: t.calendarUnit ?? null,
     usageEvery: t.usageEvery ?? null,
@@ -202,19 +212,29 @@ export async function saveWorkOrder(workOrderId: string | null, _prev: FormState
 
   let id: string;
   if (workOrderId) {
-    const existing = await db.workOrder.findUniqueOrThrow({ where: { id: workOrderId } });
-    // A PM work order's type and asset come from its schedule.
-    const manual = existing.type === "PM" ? {} : { type: w.type, assetId: w.assetId };
-    id = (await db.workOrder.update({ where: { id: workOrderId }, data: { ...data, ...manual } })).id;
+    id = await db.$transaction(async (tx) => {
+      const existing = await tx.workOrder.findUniqueOrThrow({ where: { id: workOrderId } });
+      // A PM work order's type and asset come from its schedule.
+      const manual = existing.type === "PM" ? {} : { type: w.type, assetId: w.assetId };
+      const wo = await tx.workOrder.update({ where: { id: workOrderId }, data: { ...data, ...manual } });
+      if (wo.assignedToId !== existing.assignedToId) await notifyAssigned(tx, wo, user.id);
+      return wo.id;
+    });
   } else {
     id = await db.$transaction(async (tx) => {
       const wo = await tx.workOrder.create({ data: { ...data, type: w.type, assetId: w.assetId, createdById: user.id } });
       if (w.assetDown) await startDowntime(tx, { assetId: w.assetId, userId: user.id, reason: w.title, workOrderId: wo.id });
+      await notifyAssigned(tx, wo, user.id);
       return wo.id;
     });
   }
   revalidatePath("/", "layout");
   redirect(`/work-orders/${id}`);
+}
+
+/** Tell the assignee (if it isn't the person doing the assigning). */
+function notifyAssigned(tx: Tx, wo: { id: string; number: number; title: string; assignedToId: string | null }, actorId: string) {
+  return notify(tx, [wo.assignedToId], { title: `${woNumber(wo.number)} assigned to you: ${wo.title}`, href: `/work-orders/${wo.id}` }, actorId);
 }
 
 export async function setWorkOrderStatus(workOrderId: string, status: "OPEN" | "IN_PROGRESS" | "ON_HOLD") {
@@ -316,7 +336,19 @@ export async function completeWorkOrder(workOrderId: string, _prev: FormState, f
       // Problems found on an inspection become a repair work order, if asked for.
       const problems = findProblems(results);
       if (problems.length && fd.get("followUp") === "on") {
-        await tx.workOrder.create({ data: { ...followUpFor(wo, problems, performedAt), createdById: user.id } });
+        const fu = await tx.workOrder.create({ data: { ...followUpFor(wo, problems, performedAt), createdById: user.id } });
+        await notify(
+          tx,
+          await adminIds(tx),
+          { title: `Follow-up ${woNumber(fu.number)} raised from ${woNumber(wo.number)}: ${wo.title}`, body: problems.join("; "), href: `/work-orders/${fu.id}` },
+          user.id,
+        );
+      }
+
+      // Let whoever reported the problem know it's been fixed.
+      const req = await tx.request.findUnique({ where: { workOrderId: wo.id } });
+      if (req) {
+        await notify(tx, [req.requestedById], { title: `Done: your request ${requestNumber(req.number)} — ${req.title}`, href: `/requests/${req.id}` }, user.id);
       }
 
       if (wo.pmTaskId) {
@@ -429,6 +461,16 @@ export async function createRequest(_prev: FormState, fd: FormData): Promise<For
     });
     // Downtime starts when it's reported, not when someone gets round to approving it.
     if (r.assetDown && r.assetId) await startDowntime(tx, { assetId: r.assetId, userId: user.id, reason: r.title, requestId: req.id });
+    await notify(
+      tx,
+      await adminIds(tx),
+      {
+        title: `New request ${requestNumber(req.number)}${r.assetDown ? " (machine down)" : ""}: ${req.title}`,
+        body: `From ${user.name ?? user.email}`,
+        href: `/requests/${req.id}`,
+      },
+      user.id,
+    );
     return req;
   });
   revalidatePath("/", "layout");
@@ -471,6 +513,13 @@ export async function approveRequest(requestId: string, _prev: FormState, fd: Fo
         await startDowntime(tx, { assetId: a.assetId, userId: req.requestedById, reason: req.title, workOrderId: wo.id, requestId: req.id, at: req.createdAt });
       }
       await tx.downtime.updateMany({ where: { requestId: req.id, workOrderId: null }, data: { workOrderId: wo.id } });
+      await notify(
+        tx,
+        [req.requestedById],
+        { title: `Your request ${requestNumber(req.number)} was approved: ${req.title}`, body: `Work order ${woNumber(wo.number)} was created for it.`, href: `/requests/${req.id}` },
+        user.id,
+      );
+      await notifyAssigned(tx, wo, user.id);
       return wo.id;
     });
   } catch (e) {
@@ -485,9 +534,21 @@ export async function rejectRequest(requestId: string, _prev: FormState, fd: For
   const user = await requirePermission("review");
   const parsed = rejectSchema.safeParse(fields(fd));
   if (!parsed.success) return { error: firstError(parsed.error) };
-  const { count } = await db.request.updateMany({
-    where: { id: requestId, status: "PENDING" },
-    data: { status: "REJECTED", reviewedById: user.id, reviewedAt: new Date(), reviewNote: parsed.data.note },
+  const count = await db.$transaction(async (tx) => {
+    const { count } = await tx.request.updateMany({
+      where: { id: requestId, status: "PENDING" },
+      data: { status: "REJECTED", reviewedById: user.id, reviewedAt: new Date(), reviewNote: parsed.data.note },
+    });
+    if (count) {
+      const req = await tx.request.findUniqueOrThrow({ where: { id: requestId } });
+      await notify(
+        tx,
+        [req.requestedById],
+        { title: `Your request ${requestNumber(req.number)} was not approved: ${req.title}`, body: parsed.data.note, href: `/requests/${req.id}` },
+        user.id,
+      );
+    }
+    return count;
   });
   if (count === 0) return { error: "This request has already been reviewed" };
   revalidatePath("/", "layout");
@@ -675,4 +736,116 @@ export async function sendDigestNow() {
   const r = await sendDigests(base);
   const qs = new URLSearchParams({ sent: String(r.sent), skipped: String(r.skipped), ...(r.errors.length && { error: r.errors[0] }) });
   redirect(`/people?${qs}`);
+}
+
+// ─── Checklist templates ────────────────────────────────────────────────────
+
+/** Save a template. PM schedules that use it get the new checklist, and so do
+ *  their work orders that haven't been started. */
+export async function saveTemplate(templateId: string | null, _prev: FormState, fd: FormData): Promise<FormState> {
+  await requirePermission("manage");
+  const parsed = templateSchema.safeParse(fields(fd));
+  if (!parsed.success) return { error: firstError(parsed.error) };
+  const items = checklistFromForm(fd.get("checklist"));
+  if (!items) return { error: "The checklist couldn't be read — please try again" };
+  if (items.length === 0) return { error: "Add at least one checklist item" };
+  const data = { name: parsed.data.name, description: parsed.data.description ?? null, items };
+  const clash = await db.checklistTemplate.findFirst({
+    where: { name: { equals: data.name, mode: "insensitive" }, ...(templateId && { id: { not: templateId } }) },
+  });
+  if (clash) return { error: `There's already a template called "${clash.name}"` };
+
+  let id: string;
+  try {
+    id = await db.$transaction(async (tx) => {
+      const t = templateId ? await tx.checklistTemplate.update({ where: { id: templateId }, data }) : await tx.checklistTemplate.create({ data });
+      const tasks = await tx.pmTask.findMany({ where: { checklistTemplateId: t.id }, select: { id: true } });
+      for (const task of tasks) {
+        await tx.pmTask.update({ where: { id: task.id }, data: { checklist: items } });
+        await refreshOpenPmWorkOrder(tx, task.id);
+      }
+      return t.id;
+    });
+  } catch (e) {
+    if (isUniqueViolation(e)) return { error: `There's already a template called "${data.name}"` };
+    throw e;
+  }
+  revalidatePath("/", "layout");
+  redirect(`/checklists/${id}?saved=1`);
+}
+
+/** Delete a template. PM schedules using it keep their current checklist. */
+export async function deleteTemplate(templateId: string) {
+  await requirePermission("manage");
+  await db.checklistTemplate.delete({ where: { id: templateId } });
+  revalidatePath("/", "layout");
+  redirect("/checklists");
+}
+
+// ─── Notifications ──────────────────────────────────────────────────────────
+
+export async function markAllNotificationsRead() {
+  const user = await requireUser();
+  await db.notification.updateMany({ where: { userId: user.id, readAt: null }, data: { readAt: new Date() } });
+  revalidatePath("/", "layout");
+}
+
+// ─── CSV import ─────────────────────────────────────────────────────────────
+
+export type ImportKind = "assets" | "parts";
+
+async function planImport(kind: ImportKind, text: string) {
+  if (text.length > MAX_IMPORT_BYTES) return { plan: null, error: "That file is too big — import up to 2 MB at a time." };
+  const table = parseCsv(text);
+  if (kind === "assets") {
+    const [assets, locations] = await Promise.all([
+      db.asset.findMany({ select: { id: true, name: true, assetTag: true, parentId: true, currentMeter: true } }),
+      db.location.findMany({ select: { id: true, name: true, parentId: true } }),
+    ]);
+    const plan = planAssetImport(table, assets);
+    return { plan, newLocations: missingLocations(plan, locations).map((p) => p.join(" › ")) };
+  }
+  const parts = await db.part.findMany({ select: { id: true, name: true, partNumber: true, quantity: true } });
+  return { plan: planPartImport(table, parts), newLocations: [] };
+}
+
+export type ImportPreview = {
+  error?: string;
+  errors: string[];
+  columns: string[];
+  ignored: string[];
+  newLocations: string[];
+  summary: { create: number; update: number; skip: number };
+  rows: { line: number; name: string; action: "create" | "update" | "skip"; messages: string[] }[];
+};
+
+/** Check a CSV file and say what importing it would do. Changes nothing. */
+export async function previewImport(kind: ImportKind, text: string): Promise<ImportPreview> {
+  await requirePermission("manage");
+  const { plan, newLocations = [], error } = await planImport(kind, text);
+  if (!plan) return { error, errors: [], columns: [], ignored: [], newLocations: [], summary: { create: 0, update: 0, skip: 0 }, rows: [] };
+  return {
+    errors: plan.errors,
+    columns: plan.columns,
+    ignored: plan.ignored,
+    newLocations,
+    summary: summarizePlan(plan),
+    rows: plan.rows.map(({ line, name, action, messages }) => ({ line, name, action, messages })),
+  };
+}
+
+/** Import a CSV file: the rows the preview showed as create / update. */
+export async function runImport(kind: ImportKind, text: string): Promise<{ error?: string; created?: number; updated?: number; locationsCreated?: number }> {
+  const user = await requirePermission("manage");
+  const { plan, error } = await planImport(kind, text);
+  if (!plan) return { error };
+  if (plan.errors.length) return { error: plan.errors[0] };
+  try {
+    const result = kind === "assets" ? await runAssetImport(plan, user.id) : await runPartImport(plan, user.id);
+    revalidatePath("/", "layout");
+    return result;
+  } catch (e) {
+    if (isUniqueViolation(e)) return { error: "Another change to the same asset tags or part numbers happened at the same time. Check the preview again and re-import." };
+    throw e;
+  }
 }

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
-type Counts = { overdue: number; mine: number; pendingRequests: number; lowStock: number };
+type Counts = { overdue: number; mine: number; pendingRequests: number; lowStock: number; unread: number };
 type Role = "ADMIN" | "TECH" | "REQUESTER";
 
 type NavItem = { href: string; label: string; icon: keyof typeof ICONS; badge?: { count: number; tone: "red" | "blue" | "amber"; title: string } };
@@ -44,6 +44,7 @@ function navSections(counts: Counts, role: Role): { title?: string; items: NavIt
       title: "Planning",
       items: [
         { href: "/pm", label: "PM schedules", icon: "repeat" },
+        ...(role === "ADMIN" ? [{ href: "/checklists", label: "Checklists", icon: "list" } as NavItem] : []),
         { href: "/reports", label: "Reports", icon: "chart" },
       ],
     },
@@ -79,10 +80,14 @@ export function AppShell({
 
   const sidebar = (
     <div className="flex h-full flex-col">
-      <Link href="/" className="flex items-center gap-2 px-5 py-5 text-base font-semibold text-white">
-        <span className="flex size-7 items-center justify-center rounded-md bg-sky-600 text-xs font-bold">PM</span>
-        PM System
-      </Link>
+      <div className="flex items-center justify-between px-5 py-5">
+        <Link href="/" className="flex items-center gap-2 text-base font-semibold text-white">
+          <span className="flex size-7 items-center justify-center rounded-md bg-sky-600 text-xs font-bold">PM</span>
+          PM System
+        </Link>
+        {/* On phones the bell is in the top bar instead. */}
+        <Bell count={counts.unread} className="-mr-1.5 hidden text-slate-300 hover:bg-white/10 hover:text-white lg:flex" />
+      </div>
       <div className="px-3 pb-4">
         <Link href="/requests/new" className="flex items-center justify-center gap-2 rounded-md bg-amber-500 px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-amber-400">
           <Icon name="alert" />
@@ -114,11 +119,14 @@ export function AppShell({
         <Link href="/" className="font-semibold">
           PM System
         </Link>
-        {role !== "REQUESTER" && counts.overdue > 0 && (
-          <Link href="/work-orders?due=overdue" className="ml-auto rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-medium">
-            {counts.overdue} overdue
-          </Link>
-        )}
+        <div className="ml-auto flex items-center gap-2">
+          {role !== "REQUESTER" && counts.overdue > 0 && (
+            <Link href="/work-orders?due=overdue" className="rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-medium">
+              {counts.overdue} overdue
+            </Link>
+          )}
+          <Bell count={counts.unread} className="-mr-1.5 hover:bg-white/10" />
+        </div>
       </header>
 
       {open && (
@@ -197,6 +205,25 @@ function Nav({ counts, role, isActive = () => false }: { counts: Counts; role: R
   );
 }
 
+/** Link to the notifications page, with the unread count. */
+function Bell({ count, className = "" }: { count: number; className?: string }) {
+  return (
+    <Link
+      href="/notifications"
+      aria-label={count ? `Notifications, ${count} unread` : "Notifications"}
+      title="Notifications"
+      className={`relative flex items-center rounded-md p-1.5 ${className}`}
+    >
+      <Icon name="bell" />
+      {count > 0 && (
+        <span className="absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-red-600 px-1 text-center text-[10px] leading-4 font-semibold text-white">
+          {count > 99 ? "99+" : count}
+        </span>
+      )}
+    </Link>
+  );
+}
+
 // Simple outline icons (24×24, stroke).
 const ICONS = {
   home: "M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",
@@ -212,6 +239,8 @@ const ICONS = {
   box: "M21 8 12 3 3 8m18 0v8l-9 5m9-13-9 5m0 8-9-5V8m9 13v-8M3 8l9 5",
   users: "M16 19a4 4 0 0 0-8 0m4-7a3 3 0 1 0 0-6 3 3 0 0 0 0 6m6 7a3 3 0 0 0-2-2.8M17 6.2a3 3 0 0 1 0 5.6M4 19a3 3 0 0 1 2-2.8M7 6.2a3 3 0 0 0 0 5.6",
   chart: "M4 20h16M7 16v-5m5 5V7m5 9v-8",
+  bell: "M6 16V11a6 6 0 1 1 12 0v5l2 2H4zm4 4a2 2 0 0 0 4 0",
+  list: "M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01",
   menu: "M4 6h16M4 12h16M4 18h16",
   close: "M6 6l12 12M18 6 6 18",
 } as const;

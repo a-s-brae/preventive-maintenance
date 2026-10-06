@@ -4,7 +4,7 @@ import type { PmTask } from "@prisma/client";
 import { parseChecklist } from "@/lib/checklist";
 import { toDateInput, type FormState } from "@/lib/forms";
 import type { UserOption } from "@/lib/queries";
-import { ChecklistEditor } from "./checklist-editor";
+import { ChecklistEditor, type TemplateOption } from "./checklist-editor";
 import { ActionForm, Field, SubmitButton } from "./form";
 
 type Action = (prev: FormState, fd: FormData) => Promise<FormState>;
@@ -15,12 +15,14 @@ export function TaskForm({
   meterUnit,
   currentMeter,
   users,
+  templates,
 }: {
   action: Action;
   task?: PmTask;
   meterUnit: string | null;
   currentMeter: number | null;
   users: UserOption[];
+  templates: TemplateOption[];
 }) {
   return (
     <ActionForm action={action} className="space-y-5">
@@ -35,7 +37,7 @@ export function TaskForm({
         <p className="mb-2 text-xs text-slate-500">
           Filled in when the work order is completed. Use pass / fail for inspections and number for readings like pressures — give a reading a min / max and anything outside it is flagged. A failed check or a reading out of limits offers a follow-up repair work order.
         </p>
-        <ChecklistEditor initial={parseChecklist(task?.checklist)} />
+        <ChecklistEditor initial={parseChecklist(task?.checklist)} templates={templates} initialTemplateId={task?.checklistTemplateId} />
       </div>
 
       <fieldset className="rounded-md border border-slate-200 p-4">

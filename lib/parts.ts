@@ -2,6 +2,7 @@
 // part's row and records a StockTransaction, so counts can't drift under
 // concurrent use and every change has a history line.
 import type { Part, Prisma, StockReason } from "@prisma/client";
+import { adminIds, notify, type Notice } from "@/lib/notify";
 
 export type StockStatus = "OUT" | "LOW" | "OK";
 
@@ -25,6 +26,8 @@ export async function adjustStock(
     workOrderId?: string | null;
     unitCost?: number | null;
     note?: string | null;
+    /** Tell admins when this takes the part low (default). Off for bulk imports. */
+    alert?: boolean;
   },
 ): Promise<Part> {
   await tx.$queryRaw`SELECT id FROM "Part" WHERE id = ${opts.partId} FOR UPDATE`;
@@ -50,8 +53,26 @@ export async function adjustStock(
       userId: opts.userId,
     },
   });
+  const alert = opts.alert === false ? null : stockAlert(part, updated);
+  if (alert) await notify(tx, await adminIds(tx), alert, opts.userId);
   return updated;
 }
+
+/** A stock change that takes a part from OK to low or out, worth telling admins about. */
+export function stockAlert(
+  before: { quantity: number; minQuantity: number | null },
+  after: { id: string; name: string; unit: string; quantity: number; minQuantity: number | null },
+): Notice | null {
+  const was = stockStatus(before);
+  const now = stockStatus(after);
+  if (now === "OK" || now === was || (was === "OUT" && now === "LOW")) return null;
+  return {
+    title: now === "OUT" ? `Out of stock: ${after.name}` : `Low stock: ${after.name}`,
+    body: `${after.quantity} ${after.unit} left${after.minQuantity != null ? ` (reorder at ${after.minQuantity})` : ""}`,
+    href: `/parts/${after.id}`,
+  };
+}
+
 
 /** Quantities are kept to 3 decimals (feet, quarts…) to avoid float dust. */
 export const roundQty = (n: number) => Math.round(n * 1000) / 1000;

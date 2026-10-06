@@ -1,6 +1,7 @@
 // Work orders: the unit of maintenance work. PM schedules create them when
 // they come due; repairs and inspections are created by hand.
 import type { PmTask, Prisma, PrismaClient, WorkOrder } from "@prisma/client";
+import { notify } from "@/lib/notify";
 import { computeDue, daysUntil, USAGE_DUE_SOON_FRACTION, type DueStatus } from "@/lib/schedule";
 
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -70,11 +71,21 @@ export async function syncPmWorkOrders(db: Db): Promise<number> {
     return s === "OVERDUE" || s === "DUE_SOON";
   });
   if (due.length === 0) return 0;
-  const { count } = await db.workOrder.createMany({
+  const created = await db.workOrder.createManyAndReturn({
     data: due.map((t) => pmWorkOrderData(t, t.asset.currentMeter)),
     skipDuplicates: true,
+    select: { id: true, number: true, title: true, assignedToId: true, dueDate: true },
   });
-  return count;
+  // Tell each default assignee about their new PM work order.
+  for (const wo of created) {
+    if (!wo.assignedToId) continue;
+    await notify(db, [wo.assignedToId], {
+      title: `New PM ${woNumber(wo.number)}: ${wo.title}`,
+      body: wo.dueDate ? `Due ${wo.dueDate.toISOString().slice(0, 10)}` : null,
+      href: `/work-orders/${wo.id}`,
+    });
+  }
+  return created.length;
 }
 
 /** Create the work order for a PM schedule now, even if it isn't due yet.

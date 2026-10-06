@@ -33,6 +33,9 @@ computer (`npm run local`) or hosted on Vercel.
 | **Labor time** | Start / stop timer on a work order (several people can be on the clock), or log time afterwards. Totals on the work order and in reports. |
 | **Photos & files** | Attach photos and PDFs to work orders and assets (manuals, nameplates). Phone photos are shrunk before uploading. |
 | **Printable records** | A printable work order record (checklist, parts, time, photos, sign-off lines) and an asset's maintenance history for any date range — print or save as PDF for audits. |
+| **Checklist templates** | Write a checklist once (e.g. *Forklift pre-shift inspection*) and pick it on any number of PM schedules. Changing the template updates every PM that follows it, and their work orders that haven't been started. Start a template from scratch or from an existing PM's checklist. Admin › Planning › **Checklists**. |
+| **CSV import** | Bulk-load or bulk-edit **assets** and **parts** from Excel: export, edit, import. A preview shows what each row will do (new / update / skipped with the reason) before anything changes. Assets match by tag, parts by part number; missing locations are created; parents can be in the same file. |
+| **Notifications** | A bell (top of the sidebar, or the top bar on phones) with an unread count. You're told when a work order is assigned to you or a PM work order is created for you, when your request is approved, rejected or done, and — for admins — about new requests, follow-up repairs and parts going low or out of stock. |
 | **Reports** | Pick a date range (30 / 90 days, 12 months, this year, or custom). KPIs: **PM compliance** (done by the due date), work orders done / open / overdue, **downtime**, **MTTR / MTBF**, and **maintenance cost** (parts, plus labor at an hourly rate you enter). Charts of work done by type, compliance over time, downtime and cost by asset, and a per-asset table with CSV export. |
 | **QR labels** | Print 2″ × 4″ labels (Avery 5163) for one asset, a location or all equipment. Scanning opens the asset for staff, and **Report a problem** with the asset filled in for everyone else (after sign-in if needed). |
 | **Daily email** | Each weekday morning, techs and admins get their overdue / due-soon work orders, and admins a plant summary. Needs email set up (hosted only); preview it on the People page. |
@@ -146,6 +149,9 @@ app/
     tasks/[id]/edit       edit a PM schedule
     history/              completed work orders
     reports/              KPIs, charts and per-asset table (+ CSV export)
+    checklists/           checklist templates
+    notifications/        the bell's list ([id] opens one and marks it read)
+    assets/import, parts/import   CSV import with preview
   a/[id]                  where QR labels point (asset for staff, report a problem for others)
   print/                  printable work orders, asset history, QR labels
 auth.ts                   Auth.js config + domain allow-list + requireUser()
@@ -153,6 +159,8 @@ lib/schedule.ts           PM due-date rules (pure, tested)
 lib/work-orders.ts        PM → work order generation, work order due status
 lib/checklist.ts          typed checklist items, reading limits, answers (pure, tested)
 lib/reports.ts            PM compliance, MTTR / MTBF, date ranges (pure, tested)
+lib/csv-import.ts         CSV parsing and import planning (pure, tested); import-run.ts applies it
+lib/notify.ts             in-app notifications
 lib/actions.ts            server actions (all writes)
 lib/queries.ts            shared reads (open work orders, PM schedules, users)
 lib/forms.ts              zod validation + formatting helpers
@@ -171,3 +179,7 @@ is copied; Atlas is AGPL).
 3. ~~Parts & stock, labor time, photos & files, roles, daily email, printable records~~ ✅
 4. ~~Reports (PM compliance, MTBF / MTTR, cost per asset), QR labels on equipment,
    reading limits with follow-up work orders~~ ✅
+5. ~~Checklist templates, CSV import of assets and parts, notifications bell~~ ✅
+
+Ideas for later: purchasing (vendors, purchase requests, receiving into stock),
+a workload view per technician, on-screen signatures.

@@ -15,7 +15,7 @@ export async function GET(req: Request) {
   const rows = f.view === "complete" ? await loadCompletedWorkOrders(f) : await loadOpenWorkOrders(f, session.user.id);
 
   const csv = toCsv(
-    ["Number", "Title", "Type", "Status", "Priority", "Asset", "Asset tag", "Location", "Assigned to", "Due date", "Due meter", "Created", "Completed", "Completed by", "Meter reading", "Checklist done", "Checklist failed", "Notes"],
+    ["Number", "Title", "Type", "Status", "Priority", "Asset", "Asset tag", "Location", "Assigned to", "Due date", "Due meter", "Created", "Completed", "Completed by", "Meter reading", "Checklist done", "Checklist problems", "Notes"],
     rows.map((wo) => {
       const s = summarize(parseResults(wo.checklistResults));
       return [

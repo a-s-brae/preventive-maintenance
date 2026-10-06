@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ChecklistItem, ChecklistResult } from "@/lib/checklist";
+import { describeLimits, limitStatus, parseAnswer, type ChecklistItem, type ChecklistResult } from "@/lib/checklist";
 import { toDateInput, type FormState } from "@/lib/forms";
 import { ActionForm, Field, SubmitButton } from "./form";
 
@@ -37,6 +37,19 @@ export function CompleteForm({
   const router = useRouter();
   const [saveState, setSaveState] = useState<SaveState>({ kind: "idle" });
   const pending = useRef(0);
+  // Items currently answered Fail or out of limits, by index.
+  const [flagged, setFlagged] = useState<ReadonlySet<number>>(() => new Set());
+  const onFlag = useCallback(
+    (index: number, isFlagged: boolean) =>
+      setFlagged((prev) => {
+        if (prev.has(index) === isFlagged) return prev;
+        const next = new Set(prev);
+        if (isFlagged) next.add(index);
+        else next.delete(index);
+        return next;
+      }),
+    [],
+  );
 
   const onSave = useCallback(
     async (index: number, raw: string, note: string) => {
@@ -67,7 +80,7 @@ export function CompleteForm({
           </div>
           <ul className="divide-y divide-slate-100">
             {checklist.map((item, i) => (
-              <ChecklistRow key={i} item={item} index={i} draft={drafts[i]} onSave={onSave} />
+              <ChecklistRow key={i} item={item} index={i} draft={drafts[i]} onSave={onSave} onFlag={onFlag} />
             ))}
           </ul>
         </fieldset>
@@ -88,6 +101,15 @@ export function CompleteForm({
       <Field label="Notes">
         <textarea name="notes" rows={4} className="input" placeholder="What was done, parts used, issues found…" />
       </Field>
+      {flagged.size > 0 && (
+        <label className="flex items-start gap-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-900 ring-1 ring-red-200">
+          <input type="checkbox" name="followUp" defaultChecked className="mt-0.5 size-4" />
+          <span>
+            Create a follow-up repair work order for the {flagged.size === 1 ? "problem" : `${flagged.size} problems`} found
+            <span className="block text-xs text-red-800">Failed checks and readings outside their limits are listed in it.</span>
+          </span>
+        </label>
+      )}
       {assetDown && (
         <label className="flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900 ring-1 ring-emerald-200">
           <input type="checkbox" name="assetUp" defaultChecked className="size-4" />
@@ -124,13 +146,19 @@ function ChecklistRow({
   index,
   draft,
   onSave,
+  onFlag,
 }: {
   item: ChecklistItem;
   index: number;
   draft: Draft;
   onSave: (index: number, raw: string, note: string) => Promise<void>;
+  onFlag: (index: number, flagged: boolean) => void;
 }) {
   const [raw, setRaw] = useState(() => toRaw(item, draft?.value));
+  const answer = parseAnswer(item, raw);
+  const outOfLimits = "value" in answer ? limitStatus(item, answer.value) : null;
+  const flagged = raw === "FAIL" || !!outOfLimits;
+  useEffect(() => onFlag(index, flagged), [index, flagged, onFlag]);
   const [note, setNote] = useState(draft?.note ?? "");
   const [showNote, setShowNote] = useState(!!draft?.note);
   const latest = useRef({ raw, note });
@@ -202,8 +230,11 @@ function ChecklistRow({
         )}
         {item.type === "NUMBER" && (
           <label className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2">
-            <span>{item.label}</span>
-            <span className="flex items-center gap-2">
+            <span>
+              {item.label}
+              {describeLimits(item) && <span className="block text-xs text-slate-500">OK: {describeLimits(item)}</span>}
+            </span>
+            <span className="flex flex-wrap items-center justify-end gap-2">
               <input
                 name={name}
                 type="number"
@@ -211,9 +242,11 @@ function ChecklistRow({
                 value={raw}
                 onChange={(e) => change({ raw: e.target.value }, true)}
                 onBlur={flush}
-                className="input w-32"
+                aria-invalid={!!outOfLimits}
+                className={`input w-32 ${outOfLimits ? "ring-2 ring-red-500" : ""}`}
               />
               {item.unit && <span className="text-slate-500">{item.unit}</span>}
+              {outOfLimits && <span className="w-full text-right text-xs font-medium text-red-700">{outOfLimits === "HIGH" ? "Above" : "Below"} limit</span>}
             </span>
           </label>
         )}

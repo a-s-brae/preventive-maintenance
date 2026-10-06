@@ -95,6 +95,9 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
             <a href={`/print/assets/${asset.id}`} target="_blank" rel="noreferrer" className="btn-secondary">
               Print history
             </a>
+            <a href={`/print/labels?asset=${asset.id}`} target="_blank" rel="noreferrer" className="btn-secondary">
+              QR label
+            </a>
             {canManage && (
               <ButtonLink href={`/assets/${asset.id}/edit`} variant="secondary">
                 Edit

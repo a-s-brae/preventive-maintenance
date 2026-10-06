@@ -37,6 +37,9 @@ export default async function LocationPage({ params }: { params: Promise<{ id: s
           {location?.notes && <p className="mt-1 max-w-2xl text-sm whitespace-pre-wrap text-slate-600">{location.notes}</p>}
         </div>
         <div className={`flex flex-wrap gap-2 ${can(me.role, "manage") ? "" : "hidden"}`}>
+          <a href={`/print/labels?location=${id}`} target="_blank" rel="noreferrer" className="btn-secondary">
+            QR labels
+          </a>
           <ButtonLink href={`/locations/new?parentId=${id}`} variant="secondary">
             + Location inside
           </ButtonLink>

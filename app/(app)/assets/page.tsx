@@ -56,6 +56,9 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
         <a href="/assets/export" className="btn-secondary" download>
           Export CSV
         </a>
+        <a href={`/print/labels${location ? `?location=${location}` : ""}`} target="_blank" rel="noreferrer" className="btn-secondary">
+          QR labels
+        </a>
         {can(me.role, "manage") && <ButtonLink href={`/assets/new${location ? `?locationId=${location}` : ""}`}>+ Asset</ButtonLink>}
       </PageHeader>
       <form className="mb-3 flex flex-wrap items-center gap-2">

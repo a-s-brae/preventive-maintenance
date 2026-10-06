@@ -3,15 +3,17 @@
 import { useState } from "react";
 import { CHECKLIST_TYPE_LABEL, CHECKLIST_TYPES, type ChecklistItem, type ChecklistType } from "@/lib/checklist";
 
-type Row = ChecklistItem & { key: number };
+// Limits are kept as typed (so "-" or "1." can be on the way to a number).
+type Row = Omit<ChecklistItem, "min" | "max"> & { key: number; min: string; max: string };
 
 let nextKey = 0;
-const toRow = (item: ChecklistItem): Row => ({ ...item, key: nextKey++ });
+const toRow = (item: ChecklistItem): Row => ({ ...item, min: item.min?.toString() ?? "", max: item.max?.toString() ?? "", key: nextKey++ });
+const toLimit = (text: string) => (text.trim() !== "" && Number.isFinite(Number(text)) ? Number(text) : undefined);
 
 /** Edits a PM checklist. Submits it as JSON in a hidden `checklist` field. */
 export function ChecklistEditor({ initial }: { initial: ChecklistItem[] }) {
   const [rows, setRows] = useState<Row[]>(() => initial.map(toRow));
-  const update = (key: number, patch: Partial<ChecklistItem>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  const update = (key: number, patch: Partial<Row>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
   const move = (index: number, by: number) =>
     setRows((rs) => {
       const next = [...rs];
@@ -20,7 +22,9 @@ export function ChecklistEditor({ initial }: { initial: ChecklistItem[] }) {
       return next;
     });
 
-  const items = rows.map(({ label, type, unit }) => ({ label, type, ...(type === "NUMBER" && unit ? { unit } : {}) }));
+  const items = rows.map(({ label, type, unit, min, max }) =>
+    type === "NUMBER" ? { label, type, ...(unit && { unit }), min: toLimit(min), max: toLimit(max) } : { label, type },
+  );
 
   return (
     <div className="space-y-2">
@@ -48,13 +52,33 @@ export function ChecklistEditor({ initial }: { initial: ChecklistItem[] }) {
             ))}
           </select>
           {row.type === "NUMBER" && (
-            <input
-              aria-label={`Unit for item ${i + 1}`}
-              value={row.unit ?? ""}
-              onChange={(e) => update(row.key, { unit: e.target.value })}
-              placeholder="unit"
-              className="input w-20"
-            />
+            <>
+              <input
+                aria-label={`Unit for item ${i + 1}`}
+                value={row.unit ?? ""}
+                onChange={(e) => update(row.key, { unit: e.target.value })}
+                placeholder="unit"
+                className="input w-20"
+              />
+              <input
+                aria-label={`Lowest OK value for item ${i + 1}`}
+                title="Lowest OK reading (optional)"
+                inputMode="decimal"
+                value={row.min}
+                onChange={(e) => update(row.key, { min: e.target.value })}
+                placeholder="min"
+                className="input w-20"
+              />
+              <input
+                aria-label={`Highest OK value for item ${i + 1}`}
+                title="Highest OK reading (optional)"
+                inputMode="decimal"
+                value={row.max}
+                onChange={(e) => update(row.key, { max: e.target.value })}
+                placeholder="max"
+                className="input w-20"
+              />
+            </>
           )}
           <div className="flex shrink-0 gap-1">
             <button type="button" onClick={() => move(i, -1)} disabled={i === 0} className="btn-icon" aria-label="Move up">

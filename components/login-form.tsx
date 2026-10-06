@@ -8,9 +8,12 @@ export type LoginState = { error?: string; link?: string } | undefined;
 export function LoginForm({
   action,
   localMode,
+  next = "/",
 }: {
   action: (prev: LoginState, fd: FormData) => Promise<LoginState>;
   localMode: boolean;
+  /** Page to return to after signing in. */
+  next?: string;
 }) {
   const [state, dispatch, pending] = useActionState(action, undefined);
 
@@ -30,6 +33,7 @@ export function LoginForm({
       }}
     >
       <FormError error={state?.error} />
+      <input type="hidden" name="next" value={next} />
       <input name="email" type="email" required autoComplete="email" placeholder="you@as-plastech.com" className="input" />
       <button type="submit" disabled={busy} className="btn-primary w-full">
         {busy ? "Signing in…" : localMode ? "Sign in" : "Email me a sign-in link"}

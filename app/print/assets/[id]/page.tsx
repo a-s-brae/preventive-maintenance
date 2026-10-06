@@ -104,7 +104,7 @@ export default async function PrintAssetHistory({ params, searchParams }: { para
                     <td className="py-1 pr-2">{userLabel(w.completedBy)}</td>
                     <td className="py-1 pr-2 whitespace-nowrap">
                       {s.total ? `${s.answered}/${s.total}` : "—"}
-                      {s.failed ? <span className="font-medium text-red-700"> · {s.failed} failed</span> : null}
+                      {s.failed ? <span className="font-medium text-red-700"> · {s.failed} {s.failed === 1 ? "problem" : "problems"}</span> : null}
                     </td>
                     <td className="py-1 whitespace-pre-wrap">{w.completionNotes ?? ""}</td>
                   </tr>

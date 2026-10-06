@@ -12,24 +12,29 @@ const ERRORS: Record<string, string> = {
 };
 const GENERIC_ERROR = "Sign-in failed. Please try again.";
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  if ((await auth())?.user) redirect("/");
-  const { error } = await searchParams;
+/** Where to go after signing in: a path on this site only. */
+const safeNext = (v: unknown) => (typeof v === "string" && /^\/(?![/\\])/.test(v) ? v : "/");
+
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; next?: string }> }) {
+  const { error, next: nextParam } = await searchParams;
+  const next = safeNext(nextParam);
+  if ((await auth())?.user) redirect(next);
 
   async function requestSignIn(_prev: LoginState, fd: FormData): Promise<LoginState> {
     "use server";
     const email = String(fd.get("email") ?? "").trim().toLowerCase();
+    const redirectTo = safeNext(fd.get("next"));
     if (!isAllowedEmail(email)) return { error: ERRORS.AccessDenied };
     const existing = await db.user.findUnique({ where: { email }, select: { active: true } });
     if (existing && !existing.active) return { error: "Your account has been deactivated. Ask an admin if you need access again." };
     try {
       if (localLogin) {
-        await signIn("resend", { email, redirect: false, redirectTo: "/" });
+        await signIn("resend", { email, redirect: false, redirectTo });
         const link = takeLocalLink(email);
         return link ? { link } : { error: GENERIC_ERROR };
       }
       // Sends the email, then redirects (by throwing) to "check your email".
-      await signIn("resend", { email, redirectTo: "/" });
+      await signIn("resend", { email, redirectTo });
     } catch (e) {
       if (e instanceof AuthError) return { error: ERRORS[e.type] ?? GENERIC_ERROR };
       throw e;
@@ -53,7 +58,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             {ERRORS[error] ?? GENERIC_ERROR}
           </p>
         )}
-        <LoginForm action={requestSignIn} localMode={localLogin} />
+        <LoginForm action={requestSignIn} localMode={localLogin} next={next} />
       </div>
     </main>
   );

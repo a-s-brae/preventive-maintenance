@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { woNumber, workOrderDue } from "./work-orders";
+import { followUpFor, woNumber, workOrderDue } from "./work-orders";
 
 const d = (s: string) => new Date(`${s}T12:00:00Z`);
 const now = d("2026-03-10");
@@ -26,4 +26,16 @@ it("treats completed work orders as done", () => {
 it("formats numbers", () => {
   expect(woNumber(7)).toBe("WO-0007");
   expect(woNumber(12345)).toBe("WO-12345");
+});
+
+it("builds a follow-up repair work order from problems", () => {
+  const fu = followUpFor({ id: "w1", number: 12, title: "Drain receiver", assetId: "a1", priority: "LOW" }, ["No leaks: Fail"], new Date(Date.UTC(2026, 9, 6, 12)));
+  expect(fu).toEqual({
+    type: "REPAIR",
+    title: "Follow up: Drain receiver",
+    description: "Found during WO-0012 on 2026-10-06:\n- No leaks: Fail",
+    assetId: "a1",
+    priority: "MEDIUM",
+    followUpOfId: "w1",
+  });
 });

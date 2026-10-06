@@ -16,6 +16,7 @@ computer (`npm run local`) or hosted on Vercel.
 | **PM schedules** | Each asset can have many. Interval by **calendar** (every N days/weeks/months/years), **usage** (every N meter units), or **both** (whichever comes first). When one comes due it **creates a work order** automatically, with its checklist, priority and default assignee. "Start early" creates it before it's due. |
 | **Fixed vs. from completion** | After each completion, the next calendar due date is either counted from when it was done, or kept on a **fixed calendar** (e.g. the 1st of every month) — for compliance checks. |
 | **Checklists** | Items can be a checkbox, **pass / fail**, a **number** reading (with unit, e.g. psi) or **text**. Answers are saved with the completed work order; failed items are flagged in the history. |
+| **Reading limits & follow-ups** | A number reading can have a min / max (e.g. tank pressure 90–125 psi). Readings outside it are flagged as they're typed. When an inspection finds problems (a fail or a reading out of limits), completing it offers a **follow-up repair work order** listing them, linked both ways. |
 | **Due status** | **Overdue**, **Due soon**, or **OK**. A PM's work order is created N days before its calendar date (capped at ¼ of the interval) or in the last 10% of its usage interval. |
 | **Assets** | Name, tag, category, location, make/model/serial, status (active / inactive / retired), optional meter (hours, cycles, miles…). Asset pages show open work orders, PM schedules and history. |
 | **Meter readings** | Log a reading any time (or when completing a work order). Readings can't go backwards. |
@@ -32,6 +33,8 @@ computer (`npm run local`) or hosted on Vercel.
 | **Labor time** | Start / stop timer on a work order (several people can be on the clock), or log time afterwards. Totals on the work order and in reports. |
 | **Photos & files** | Attach photos and PDFs to work orders and assets (manuals, nameplates). Phone photos are shrunk before uploading. |
 | **Printable records** | A printable work order record (checklist, parts, time, photos, sign-off lines) and an asset's maintenance history for any date range — print or save as PDF for audits. |
+| **Reports** | Pick a date range (30 / 90 days, 12 months, this year, or custom). KPIs: **PM compliance** (done by the due date), work orders done / open / overdue, **downtime**, **MTTR / MTBF**, and **maintenance cost** (parts, plus labor at an hourly rate you enter). Charts of work done by type, compliance over time, downtime and cost by asset, and a per-asset table with CSV export. |
+| **QR labels** | Print 2″ × 4″ labels (Avery 5163) for one asset, a location or all equipment. Scanning opens the asset for staff, and **Report a problem** with the asset filled in for everyone else (after sign-in if needed). |
 | **Daily email** | Each weekday morning, techs and admins get their overdue / due-soon work orders, and admins a plant summary. Needs email set up (hosted only); preview it on the People page. |
 | **Sign-in** | Email magic link, restricted to `ALLOWED_EMAIL_DOMAINS` (default `as-plastech.com`). In local mode, sign-in skips the email step. |
 
@@ -60,6 +63,10 @@ account, email service or cloud setup.
    **Add asset** to start entering real equipment.
 
 **Keep the window open** while you use it. Close it (or press Ctrl+C) to stop.
+
+Other devices on the same network (a phone scanning a QR label, a tablet on the
+floor) can use the **network address** the window shows, e.g. `http://192.168.1.20:3000`.
+Print QR labels from that address so the codes point somewhere phones can reach.
 
 | Command | What it does |
 |---------|--------------|
@@ -100,8 +107,9 @@ stay on and awake for others to use it.
    | `EMAIL_FROM` | e.g. `PM System <pm@as-plastech.com>` (must be on the verified domain) |
    | `ALLOWED_EMAIL_DOMAINS` | `as-plastech.com` (comma-separate to allow more) |
    | `CRON_SECRET` | any long random string — protects the daily email job (Vercel sends it automatically) |
-   | `APP_URL` | the site's address, e.g. `https://pm.as-plastech.com` (used for links in emails) |
-   | `ORG_NAME` | optional — company name on printed records (default "A.S. Plastech") |
+   | `APP_URL` | the site's address, e.g. `https://pm.as-plastech.com` (used for links in emails and QR labels) |
+   | `ORG_NAME` | optional — company name on printed records and labels (default "A.S. Plastech") |
+   | `LABOR_RATE` | optional — default labor cost per hour for reports (can be changed on the page) |
 
 5. **Deploy.** The `vercel-build` script runs `prisma migrate deploy`, so the tables
    are created on the first deploy.
@@ -137,10 +145,14 @@ app/
     assets/               list, new, [id] detail, edit, add PM schedule
     tasks/[id]/edit       edit a PM schedule
     history/              completed work orders
+    reports/              KPIs, charts and per-asset table (+ CSV export)
+  a/[id]                  where QR labels point (asset for staff, report a problem for others)
+  print/                  printable work orders, asset history, QR labels
 auth.ts                   Auth.js config + domain allow-list + requireUser()
 lib/schedule.ts           PM due-date rules (pure, tested)
 lib/work-orders.ts        PM → work order generation, work order due status
-lib/checklist.ts          typed checklist items and answers (pure, tested)
+lib/checklist.ts          typed checklist items, reading limits, answers (pure, tested)
+lib/reports.ts            PM compliance, MTTR / MTBF, date ranges (pure, tested)
 lib/actions.ts            server actions (all writes)
 lib/queries.ts            shared reads (open work orders, PM schedules, users)
 lib/forms.ts              zod validation + formatting helpers
@@ -157,5 +169,5 @@ is copied; Atlas is AGPL).
 1. ~~Work orders as the core, fixed schedules, typed checklists, calendar~~ ✅
 2. ~~Plant structure: locations tree, parent/child assets, downtime logging, requests~~ ✅
 3. ~~Parts & stock, labor time, photos & files, roles, daily email, printable records~~ ✅
-4. Reports (PM compliance, MTBF / MTTR, cost per asset), QR labels on equipment,
-   meter threshold alerts.
+4. ~~Reports (PM compliance, MTBF / MTTR, cost per asset), QR labels on equipment,
+   reading limits with follow-up work orders~~ ✅

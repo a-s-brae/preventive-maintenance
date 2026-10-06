@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 import { requirePermission } from "@/auth";
 import { db } from "@/lib/db";
-import { checklistFromForm, draftAnswers, NOTE_MAX, parseAnswer, parseChecklist, resultsFromForm, type ChecklistResult } from "@/lib/checklist";
+import { checklistFromForm, draftAnswers, findProblems, NOTE_MAX, parseAnswer, parseChecklist, resultsFromForm, type ChecklistResult } from "@/lib/checklist";
 import { endDowntime, startDowntime } from "@/lib/downtime";
 import { headers } from "next/headers";
 import { sendDigests } from "@/lib/digest";
@@ -34,7 +34,7 @@ import {
 import { loadSampleData } from "@/lib/sample-data";
 import { nextFixedCycle } from "@/lib/schedule";
 import { wouldCycle } from "@/lib/tree";
-import { openPmWorkOrder, refreshOpenPmWorkOrder, syncPmWorkOrders } from "@/lib/work-orders";
+import { followUpFor, openPmWorkOrder, refreshOpenPmWorkOrder, syncPmWorkOrders } from "@/lib/work-orders";
 
 const fields = (fd: FormData) => Object.fromEntries(fd.entries());
 
@@ -312,6 +312,12 @@ export async function completeWorkOrder(workOrderId: string, _prev: FormState, f
           checklistResults: results,
         },
       });
+
+      // Problems found on an inspection become a repair work order, if asked for.
+      const problems = findProblems(results);
+      if (problems.length && fd.get("followUp") === "on") {
+        await tx.workOrder.create({ data: { ...followUpFor(wo, problems, performedAt), createdById: user.id } });
+      }
 
       if (wo.pmTaskId) {
         const task = await tx.pmTask.findUnique({ where: { id: wo.pmTaskId } });

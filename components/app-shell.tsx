@@ -42,7 +42,10 @@ function navSections(counts: Counts, role: Role): { title?: string; items: NavIt
     },
     {
       title: "Planning",
-      items: [{ href: "/pm", label: "PM schedules", icon: "repeat" }],
+      items: [
+        { href: "/pm", label: "PM schedules", icon: "repeat" },
+        { href: "/reports", label: "Reports", icon: "chart" },
+      ],
     },
     ...(role === "ADMIN" ? [{ title: "Admin", items: [{ href: "/people", label: "People", icon: "users" } as NavItem] }] : []),
   ];
@@ -208,6 +211,7 @@ const ICONS = {
   alert: "M12 9v4m0 4h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0",
   box: "M21 8 12 3 3 8m18 0v8l-9 5m9-13-9 5m0 8-9-5V8m9 13v-8M3 8l9 5",
   users: "M16 19a4 4 0 0 0-8 0m4-7a3 3 0 1 0 0-6 3 3 0 0 0 0 6m6 7a3 3 0 0 0-2-2.8M17 6.2a3 3 0 0 1 0 5.6M4 19a3 3 0 0 1 2-2.8M7 6.2a3 3 0 0 0 0 5.6",
+  chart: "M4 20h16M7 16v-5m5 5V7m5 9v-8",
   menu: "M4 6h16M4 12h16M4 18h16",
   close: "M6 6l12 12M18 6 6 18",
 } as const;

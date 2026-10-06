@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checklistFromForm, formatValue, parseChecklist, parseResults, resultsFromForm, summarize, type ChecklistItem } from "./checklist";
+import { checklistFromForm, describeLimits, findProblems, formatValue, limitStatus, parseChecklist, parseResults, resultsFromForm, summarize, type ChecklistItem, type ChecklistResult } from "./checklist";
 
 const items: ChecklistItem[] = [
   { label: "Drain tank", type: "CHECK" },
@@ -68,4 +68,26 @@ it("summarizes and formats results", () => {
   const { results } = resultsFromForm(items, form({ "check-0": "on", "check-1": "FAIL", "check-2": "90" }));
   expect(summarize(results)).toEqual({ total: 4, answered: 3, failed: 1 });
   expect(results.map(formatValue)).toEqual(["Done", "Fail", "90 psi", "—"]);
+});
+
+it("flags readings outside their limits and lists problems", () => {
+  const [p] = parseChecklist([{ label: "Tank pressure", type: "NUMBER", unit: "psi", min: 125, max: 90 }]);
+  expect(p).toEqual({ label: "Tank pressure", type: "NUMBER", unit: "psi", min: 90, max: 125 }); // swapped back
+  expect(parseChecklist([{ label: "Belt", type: "CHECK", min: 1 }])).toEqual([{ label: "Belt", type: "CHECK" }]);
+  expect(limitStatus(p, 80)).toBe("LOW");
+  expect(limitStatus(p, 125)).toBe(null);
+  expect(limitStatus(p, 130)).toBe("HIGH");
+  expect(limitStatus(p, null)).toBe(null);
+  expect(describeLimits(p)).toBe("90–125 psi");
+  expect(describeLimits({ min: 5 })).toBe("at least 5");
+  expect(describeLimits({ max: 50, unit: "°F" })).toBe("at most 50 °F");
+
+  const results: ChecklistResult[] = [
+    { ...p, value: 140 },
+    { label: "No leaks", type: "PASS_FAIL", value: "FAIL", note: "inlet fitting" },
+    { label: "Drain", type: "PASS_FAIL", value: "PASS" },
+    { label: "Dew point", type: "NUMBER", value: 38, max: 50 },
+  ];
+  expect(findProblems(results)).toEqual(["Tank pressure: 140 psi — above 90–125 psi", "No leaks: Fail (inlet fitting)"]);
+  expect(summarize(results).failed).toBe(2);
 });

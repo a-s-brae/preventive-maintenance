@@ -13,6 +13,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 import readline from "node:readline/promises";
 import { fileURLToPath } from "node:url";
@@ -22,13 +23,18 @@ process.chdir(root);
 process.env.NEXT_TELEMETRY_DISABLED = "1";
 
 const DB = { name: "pm-system", port: 51213, dbPort: 51214, shadowPort: 51215 };
-// The app reaches the local database through the Prisma dev server
-// (prisma+postgres://), which keeps each client's queries separate. Its api_key
-// only carries the underlying connection details — nothing secret.
-const tcpUrl = (port) =>
-  `postgres://postgres:postgres@localhost:${port}/template1?sslmode=disable&connection_limit=10&connect_timeout=0&max_idle_connection_lifetime=0&pool_timeout=0&socket_timeout=0`;
-const apiKey = Buffer.from(JSON.stringify({ name: DB.name, databaseUrl: tcpUrl(DB.dbPort), shadowDatabaseUrl: tcpUrl(DB.shadowPort) }));
-const LOCAL_DB_URL = `prisma+postgres://localhost:${DB.port}/?api_key=${apiKey.toString("base64url")}`;
+// The local database (PGlite, via `prisma dev`) is a single Postgres session,
+// so the app talks to it over ONE connection: queries from two requests at once
+// (or two transactions) on separate connections get mixed up. pgbouncer=true
+// turns off named prepared statements, which would clash when the connection
+// is reopened in the same session.
+const tcpUrl = (port, limit) =>
+  `postgresql://postgres:postgres@localhost:${port}/template1?sslmode=disable&connection_limit=${limit}&connect_timeout=0&max_idle_connection_lifetime=0&pool_timeout=0&socket_timeout=0`;
+const LOCAL_DB_URL = `${tcpUrl(DB.dbPort, 1)}&pgbouncer=true`;
+// `prisma migrate dev` (developers only) needs the dev server's shadow database.
+// The api_key only carries those connection details — nothing secret.
+const apiKey = Buffer.from(JSON.stringify({ name: DB.name, databaseUrl: tcpUrl(DB.dbPort, 1), shadowDatabaseUrl: tcpUrl(DB.shadowPort, 1) }));
+const MIGRATE_DB_URL = `prisma+postgres://localhost:${DB.port}/?api_key=${apiKey.toString("base64url")}`;
 const APP_PORT = Number(process.env.PORT) || 3000;
 const APP_URL = `http://localhost:${APP_PORT}`;
 
@@ -99,7 +105,18 @@ function readEnvValue(name) {
   return match?.[1];
 }
 
-const usesLocalDb = () => !!readEnvValue("DATABASE_URL")?.startsWith(`prisma+postgres://localhost:${DB.port}/`);
+/** .env points at the local database (in this or an earlier version's form). */
+function usesLocalDb() {
+  const url = readEnvValue("DATABASE_URL") ?? "";
+  return url.startsWith(`prisma+postgres://localhost:${DB.port}/`) || url.startsWith(`postgresql://postgres:postgres@localhost:${DB.dbPort}/`);
+}
+
+/** Bring a local .env's database lines up to date with LOCAL_DB_URL. */
+function updateLocalDbUrl() {
+  const env = readFileSync(".env", "utf8");
+  const next = env.replace(/^(DATABASE_URL(?:_UNPOOLED)?)\s*=.*$/gm, (_, name) => `${name}="${LOCAL_DB_URL}"`);
+  if (next !== env) writeFileSync(".env", next);
+}
 
 function stopDb() {
   if (existsSync(CLI.prisma)) spawnSync(process.execPath, [CLI.prisma, "dev", "stop", DB.name], { stdio: "pipe" });
@@ -164,6 +181,7 @@ async function start() {
   // Only manage the local database if .env points at it (you can point
   // .env at a cloud database such as Neon instead).
   if (usesLocalDb()) {
+    updateLocalDbUrl();
     log("Starting the local database…");
     await startDb();
   }
@@ -189,6 +207,11 @@ async function start() {
 
   if (await waitForPort(APP_PORT, 60_000)) {
     console.log(`\n>> PM System is running at ${APP_URL}`);
+    // Phones on the same Wi-Fi (e.g. scanning QR labels) use the network address.
+    const lan = Object.values(os.networkInterfaces())
+      .flat()
+      .find((i) => i && i.family === "IPv4" && !i.internal && !i.address.startsWith("169.254."));
+    if (lan) console.log(`  On other devices on this network: http://${lan.address}:${APP_PORT}`);
     console.log("  Keep this window open while you use it. Press Ctrl+C to stop.\n");
     if (!process.argv.includes("--no-open")) openBrowser(APP_URL);
   }
@@ -199,6 +222,7 @@ async function start() {
 async function migrate() {
   if (!usesLocalDb()) fail("local:migrate only runs against the local database. Run `npm run local` first to set it up.");
   await startDb();
+  process.env.DATABASE_URL = process.env.DATABASE_URL_UNPOOLED = MIGRATE_DB_URL;
   runCli("prisma", ["migrate", "dev", ...process.argv.slice(3)]);
 }
 

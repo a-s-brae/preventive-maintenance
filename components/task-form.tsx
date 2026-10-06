@@ -33,7 +33,7 @@ export function TaskForm({
       <div>
         <div className="mb-1 text-sm font-medium text-slate-700">Checklist</div>
         <p className="mb-2 text-xs text-slate-500">
-          Filled in when the work order is completed. Use pass / fail for inspections and number for readings like pressures.
+          Filled in when the work order is completed. Use pass / fail for inspections and number for readings like pressures — give a reading a min / max and anything outside it is flagged. A failed check or a reading out of limits offers a follow-up repair work order.
         </p>
         <ChecklistEditor initial={parseChecklist(task?.checklist)} />
       </div>

@@ -92,3 +92,19 @@ export async function refreshOpenPmWorkOrder(db: Db, taskId: string): Promise<vo
   const { openForTaskId: _key, pmTaskId: _task, assetId: _asset, type: _type, ...data } = pmWorkOrderData(task, task.asset.currentMeter);
   await db.workOrder.updateMany({ where: { openForTaskId: taskId, status: "OPEN" }, data });
 }
+
+/** A repair work order for the problems an inspection found. */
+export function followUpFor(
+  wo: Pick<WorkOrder, "id" | "number" | "title" | "assetId" | "priority">,
+  problems: string[],
+  foundOn: Date,
+) {
+  return {
+    type: "REPAIR" as const,
+    title: `Follow up: ${wo.title}`.slice(0, 200),
+    description: [`Found during ${woNumber(wo.number)} on ${foundOn.toISOString().slice(0, 10)}:`, ...problems.map((p) => `- ${p}`)].join("\n"),
+    assetId: wo.assetId,
+    priority: wo.priority === "NONE" || wo.priority === "LOW" ? ("MEDIUM" as const) : wo.priority,
+    followUpOfId: wo.id,
+  };
+}

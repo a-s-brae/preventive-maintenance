@@ -16,7 +16,7 @@ function firstOfNextMonth(): Date {
 
 const check = (label: string): ChecklistItem => ({ label, type: "CHECK" });
 const passFail = (label: string): ChecklistItem => ({ label, type: "PASS_FAIL" });
-const number = (label: string, unit?: string): ChecklistItem => ({ label, type: "NUMBER", unit });
+const number = (label: string, unit?: string, limits: { min?: number; max?: number } = {}): ChecklistItem => ({ label, type: "NUMBER", unit, ...limits });
 const text = (label: string): ChecklistItem => ({ label, type: "TEXT" });
 
 /** Adds the sample assets. Does nothing if any assets already exist. */
@@ -52,7 +52,7 @@ export async function loadSampleData(tx: Prisma.TransactionClient): Promise<bool
               check("Drain condensate from receiver"),
               passFail("Auto-drain operating"),
               passFail("No leaks at fittings"),
-              number("Tank pressure", "psi"),
+              number("Tank pressure", "psi", { min: 90, max: 125 }),
             ],
           },
           {
@@ -84,7 +84,7 @@ export async function loadSampleData(tx: Prisma.TransactionClient): Promise<bool
             calendarEvery: 3,
             calendarUnit: "MONTH",
             startDate: day(40),
-            checklist: [check("Blow out condenser coil"), number("Dew point", "°F"), passFail("Drain trap working")],
+            checklist: [check("Blow out condenser coil"), number("Dew point", "°F", { max: 50 }), passFail("Drain trap working")],
           },
         ],
       },

@@ -141,7 +141,7 @@ export function CompletedWorkOrderTable({ rows, showAsset = true }: { rows: Comp
                       <span className={s.answered < s.total ? "text-amber-700" : "text-slate-600"}>
                         {s.answered}/{s.total} done
                       </span>
-                      {s.failed > 0 && <span className="ml-1 font-medium text-red-700">· {s.failed} failed</span>}
+                      {s.failed > 0 && <span className="ml-1 font-medium text-red-700">· {s.failed} {s.failed === 1 ? "problem" : "problems"}</span>}
                     </>
                   )}
                 </td>

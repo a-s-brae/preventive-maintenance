@@ -7,7 +7,7 @@ import { draftAnswers, parseChecklist, parseResults } from "@/lib/checklist";
 import { formatDate, formatNumber } from "@/lib/forms";
 import { userLabel } from "@/lib/queries";
 import { describeInterval } from "@/lib/schedule";
-import { TYPE_LABEL, woNumber, workOrderDue } from "@/lib/work-orders";
+import { STATUS_LABEL, TYPE_LABEL, woNumber, workOrderDue } from "@/lib/work-orders";
 import { formatDateTime, requestNumber } from "@/lib/downtime";
 import { formatMinutes, totalMinutes } from "@/lib/labor";
 import { formatMoney, partsCost } from "@/lib/parts";
@@ -38,6 +38,8 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
       partUsages: { include: { part: true, usedBy: true }, orderBy: { createdAt: "asc" } },
       labor: { include: { user: true }, orderBy: { startedAt: "asc" } },
       attachments: { include: { uploadedBy: true }, orderBy: { createdAt: "asc" } },
+      followUpOf: { select: { id: true, number: true } },
+      followUps: { select: { id: true, number: true, status: true }, orderBy: { number: "asc" } },
     },
   });
   if (!wo) notFound();
@@ -102,6 +104,30 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
               {requestNumber(wo.request.number)}
               {wo.request.requestedBy ? ` by ${userLabel(wo.request.requestedBy)}` : ""}
             </Link>,
+          ],
+        ] as [string, React.ReactNode][])
+      : []),
+    ...(wo.followUpOf
+      ? ([
+          [
+            "Follow-up of",
+            <Link key="fuo" href={`/work-orders/${wo.followUpOf.id}`} className="link">
+              {woNumber(wo.followUpOf.number)}
+            </Link>,
+          ],
+        ] as [string, React.ReactNode][])
+      : []),
+    ...(wo.followUps.length
+      ? ([
+          [
+            "Follow-up work",
+            <span key="fu" className="inline-flex flex-col items-end gap-1">
+              {wo.followUps.map((f) => (
+                <Link key={f.id} href={`/work-orders/${f.id}`} className="link">
+                  {woNumber(f.number)} · {STATUS_LABEL[f.status]}
+                </Link>
+              ))}
+            </span>,
           ],
         ] as [string, React.ReactNode][])
       : []),

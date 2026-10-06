@@ -239,6 +239,10 @@ model WorkOrder {
   completedBy      User?           @relation("WorkOrderCompleter", fields: [completedById], references: [id], onDelete: SetNull)
   meterReading     Float?
   completionNotes  String?
+  /// Repair work order raised because this one's inspection found problems.
+  followUpOfId     String?
+  followUpOf       WorkOrder?      @relation("FollowUp", fields: [followUpOfId], references: [id], onDelete: SetNull)
+  followUps        WorkOrder[]     @relation("FollowUp")
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
@@ -252,6 +256,7 @@ model WorkOrder {
   @@index([assetId, completedAt])
   @@index([pmTaskId])
   @@index([assignedToId])
+  @@index([followUpOfId])
 }
 
 model MeterReading {

@@ -1,9 +1,11 @@
+import { requirePermission } from "@/auth";
 import { saveLocation } from "@/lib/actions";
 import { getLocationTree } from "@/lib/queries";
 import { LocationForm } from "@/components/location-form";
 import { Card, PageHeader } from "@/components/ui";
 
 export default async function NewLocationPage({ searchParams }: { searchParams: Promise<{ parentId?: string }> }) {
+  await requirePermission("manage");
   const [{ parentId }, locations] = await Promise.all([searchParams, getLocationTree()]);
   return (
     <>

@@ -2,7 +2,9 @@ import NextAuth from "next-auth";
 import Resend from "next-auth/providers/resend";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { redirect } from "next/navigation";
+import type { Role } from "@prisma/client";
 import { db } from "@/lib/db";
+import { can, type Permission } from "@/lib/permissions";
 
 const allowedDomains = (process.env.ALLOWED_EMAIL_DOMAINS ?? "as-plastech.com")
   .split(",")
@@ -42,14 +44,40 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   ],
   pages: { signIn: "/login", verifyRequest: "/login/check-email", error: "/login" },
   callbacks: {
-    // Runs both when the link is requested and when it is used.
-    signIn: ({ user }) => isAllowedEmail(user.email),
+    // Runs both when the link is requested and when it is used. Deactivated
+    // people can't sign in.
+    signIn: ({ user }) => isAllowedEmail(user.email) && (user as { active?: boolean }).active !== false,
+    session: ({ session, user }) => {
+      const u = user as unknown as { id: string; role: Role; active: boolean };
+      return { ...session, user: { ...session.user, id: u.id, role: u.role, active: u.active } };
+    },
+  },
+  events: {
+    // The very first person to sign in to a new system becomes its admin.
+    createUser: async ({ user }) => {
+      if (user.id && (await db.user.count()) === 1) await db.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
+    },
   },
 });
 
+export type SessionUser = { id: string; email: string; name?: string | null; role: Role };
+
 /** For server components and actions: the signed-in user, or redirect to /login. */
-export async function requireUser() {
+export async function requireUser(): Promise<SessionUser> {
   const session = await auth();
-  if (!session?.user?.id) redirect("/login");
-  return session.user as { id: string; email: string; name?: string | null };
+  const user = session?.user as (SessionUser & { active?: boolean }) | undefined;
+  if (!user?.id) redirect("/login");
+  if (user.active === false) {
+    await signOut({ redirect: false });
+    redirect("/login?error=AccessDenied");
+  }
+  return user;
+}
+
+/** The signed-in user, who must have this permission. Pages send anyone else
+ *  home; actions called without it are refused the same way. */
+export async function requirePermission(permission: Permission): Promise<SessionUser> {
+  const user = await requireUser();
+  if (!can(user.role, permission)) redirect("/?denied=1");
+  return user;
 }

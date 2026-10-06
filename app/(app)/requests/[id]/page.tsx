@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { requirePermission } from "@/auth";
 import { db } from "@/lib/db";
+import { can } from "@/lib/permissions";
 import { approveRequest, rejectRequest } from "@/lib/actions";
 import { formatDateTime, requestNumber } from "@/lib/downtime";
 import { getAssetTree, getLocationTree, getUsers, userLabel } from "@/lib/queries";
@@ -12,18 +14,20 @@ import { Card, DownBadge, RequestStatusBadge } from "@/components/ui";
 export const dynamic = "force-dynamic";
 
 export default async function RequestPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ submitted?: string }> }) {
+  const user = await requirePermission("report");
   const [{ id }, { submitted }] = await Promise.all([params, searchParams]);
   const r = await db.request.findUnique({
     where: { id },
     include: { asset: true, location: true, requestedBy: true, reviewedBy: true, workOrder: true, downtimes: { orderBy: { startedAt: "desc" } } },
   });
-  if (!r) notFound();
-  const pending = r.status === "PENDING";
+  // Requesters can only open their own requests.
+  if (!r || (!can(user.role, "view") && r.requestedById !== user.id)) notFound();
+  const pending = r.status === "PENDING" && can(user.role, "review");
   const [assets, users, locations] = pending ? await Promise.all([getAssetTree(), getUsers(), getLocationTree()]) : [[], [], await getLocationTree()];
   const where = r.location ? pathLabel(locations.find((l) => l.id === r.location!.id)) : null;
 
   const details: [string, React.ReactNode][] = [
-    ["Equipment", r.asset ? <Link key="a" href={`/assets/${r.asset.id}`} className="link">{r.asset.name}</Link> : "Not given"],
+    ["Equipment", r.asset ? (can(user.role, "view") ? <Link key="a" href={`/assets/${r.asset.id}`} className="link">{r.asset.name}</Link> : r.asset.name) : "Not given"],
     ["Where", where ?? "—"],
     ["Urgency", PRIORITY_LABEL[r.priority]],
     ["Reported by", r.requestedBy ? userLabel(r.requestedBy) : "—"],
@@ -56,13 +60,24 @@ export default async function RequestPage({ params, searchParams }: { params: Pr
             <p className="text-sm whitespace-pre-wrap">{r.description ?? <span className="text-slate-500">No details given.</span>}</p>
           </Card>
 
+          {r.status === "PENDING" && !pending && (
+            <Card title="Status">
+              <p className="text-sm text-slate-600">Waiting for a supervisor to review it.</p>
+            </Card>
+          )}
           {r.status === "APPROVED" && r.workOrder && (
             <Card title="Work order">
               <p className="text-sm">
                 Approved as{" "}
-                <Link href={`/work-orders/${r.workOrder.id}`} className="link">
-                  {woNumber(r.workOrder.number)} — {r.workOrder.title}
-                </Link>{" "}
+                {can(user.role, "view") ? (
+                  <Link href={`/work-orders/${r.workOrder.id}`} className="link">
+                    {woNumber(r.workOrder.number)} — {r.workOrder.title}
+                  </Link>
+                ) : (
+                  <strong className="font-medium">
+                    {woNumber(r.workOrder.number)} — {r.workOrder.title}
+                  </strong>
+                )}{" "}
                 ({STATUS_LABEL[r.workOrder.status].toLowerCase()}).
               </p>
               {r.reviewNote && <p className="mt-2 text-sm text-slate-600">Note: {r.reviewNote}</p>}

@@ -1,5 +1,7 @@
+import { requirePermission } from "@/auth";
 import Link from "next/link";
 import { startPmNow } from "@/lib/actions";
+import { can } from "@/lib/permissions";
 import { formatDate } from "@/lib/forms";
 import { getPmSchedules, userLabel } from "@/lib/queries";
 import { describeInterval } from "@/lib/schedule";
@@ -9,6 +11,7 @@ import { Card, DueText, Empty, PageHeader, StatusBadge } from "@/components/ui";
 export const dynamic = "force-dynamic";
 
 export default async function PmSchedulesPage() {
+  const me = await requirePermission("view");
   const rows = await getPmSchedules({ asset: { status: { not: "RETIRED" } } });
   return (
     <>
@@ -42,9 +45,13 @@ export default async function PmSchedulesPage() {
                   <tr key={task.id} className={task.active && task.asset.status === "ACTIVE" ? "" : "opacity-50"}>
                     <td>{due && task.asset.status === "ACTIVE" ? <StatusBadge status={due.status} /> : <span className="text-xs text-slate-500">paused</span>}</td>
                     <td>
-                      <Link href={`/tasks/${task.id}/edit`} className="link">
-                        {task.title}
-                      </Link>
+                      {can(me.role, "manage") ? (
+                        <Link href={`/tasks/${task.id}/edit`} className="link">
+                          {task.title}
+                        </Link>
+                      ) : (
+                        task.title
+                      )}
                       <div className="text-xs text-slate-500">{userLabel(task.defaultAssignee)}</div>
                     </td>
                     <td>

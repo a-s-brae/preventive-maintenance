@@ -1,3 +1,4 @@
+import { requirePermission } from "@/auth";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { getOpenWorkOrders, getPmSchedules } from "@/lib/queries";
@@ -20,6 +21,7 @@ const dayKey = (d: Date) => d.toISOString().slice(0, 10);
 const MAX_PER_DAY = 3;
 
 export default async function CalendarPage({ searchParams }: { searchParams: Promise<{ month?: string }> }) {
+  await requirePermission("view");
   const { month } = await searchParams;
   const today = new Date();
   const [y, m] = /^\d{4}-\d{2}$/.test(month ?? "") ? month!.split("-").map(Number) : [today.getUTCFullYear(), today.getUTCMonth() + 1];

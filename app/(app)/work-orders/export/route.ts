@@ -1,4 +1,5 @@
-import { auth } from "@/auth";
+import { auth, type SessionUser } from "@/auth";
+import { can } from "@/lib/permissions";
 import { csvDate, csvResponse, toCsv } from "@/lib/csv";
 import { parseResults, summarize } from "@/lib/checklist";
 import { userLabel } from "@/lib/queries";
@@ -9,6 +10,7 @@ import { PRIORITY_LABEL, STATUS_LABEL, TYPE_LABEL, woNumber } from "@/lib/work-o
 export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user?.id) return new Response("Sign in first", { status: 401 });
+  if (!can((session.user as SessionUser).role, "view")) return new Response("Not allowed", { status: 403 });
   const f = parseFilters(Object.fromEntries(new URL(req.url).searchParams));
   const rows = f.view === "complete" ? await loadCompletedWorkOrders(f) : await loadOpenWorkOrders(f, session.user.id);
 

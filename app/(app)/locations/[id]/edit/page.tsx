@@ -1,3 +1,4 @@
+import { requirePermission } from "@/auth";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { deleteLocation, saveLocation } from "@/lib/actions";
@@ -7,6 +8,7 @@ import { DeleteLocationForm, LocationForm } from "@/components/location-form";
 import { Card, PageHeader } from "@/components/ui";
 
 export default async function EditLocationPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePermission("manage");
   const { id } = await params;
   const [location, tree] = await Promise.all([db.location.findUnique({ where: { id } }), getLocationTree()]);
   if (!location) notFound();

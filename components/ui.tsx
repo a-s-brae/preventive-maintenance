@@ -28,6 +28,17 @@ export function RequestStatusBadge({ status }: { status: "PENDING" | "APPROVED" 
   return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset ${style}`}>{label}</span>;
 }
 
+const STOCK: Record<"OUT" | "LOW" | "OK", [string, string]> = {
+  OUT: ["Out of stock", "bg-red-100 text-red-800 ring-red-200"],
+  LOW: ["Low", "bg-amber-100 text-amber-800 ring-amber-200"],
+  OK: ["In stock", "bg-emerald-100 text-emerald-800 ring-emerald-200"],
+};
+
+export function StockBadge({ status }: { status: "OUT" | "LOW" | "OK" }) {
+  const [label, style] = STOCK[status];
+  return <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium whitespace-nowrap ring-1 ring-inset ${style}`}>{label}</span>;
+}
+
 /** Red "Down" pill for equipment with open downtime. */
 export function DownBadge({ since }: { since?: string }) {
   return (

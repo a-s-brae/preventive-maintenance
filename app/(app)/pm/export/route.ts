@@ -1,4 +1,5 @@
-import { auth } from "@/auth";
+import { auth, type SessionUser } from "@/auth";
+import { can } from "@/lib/permissions";
 import { parseChecklist } from "@/lib/checklist";
 import { csvDate, csvResponse, toCsv } from "@/lib/csv";
 import { getPmSchedules, userLabel } from "@/lib/queries";
@@ -10,6 +11,7 @@ const STATUS = { OVERDUE: "Overdue", DUE_SOON: "Due soon", OK: "OK", NO_SCHEDULE
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return new Response("Sign in first", { status: 401 });
+  if (!can((session.user as SessionUser).role, "view")) return new Response("Not allowed", { status: 403 });
   const rows = await getPmSchedules({ asset: { status: { not: "RETIRED" } } });
   const csv = toCsv(
     ["PM", "Asset", "Asset tag", "Location", "Interval", "Status", "Next due date", "Next due meter", "Last done", "Open work order", "Priority", "Assigned to", "Checklist items", "Active"],

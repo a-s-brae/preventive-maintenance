@@ -1,3 +1,4 @@
+import { requirePermission } from "@/auth";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { workOrderInclude } from "@/lib/queries";
@@ -9,6 +10,7 @@ export const dynamic = "force-dynamic";
 const PAGE_SIZE = 50;
 
 export default async function HistoryPage({ searchParams }: { searchParams: Promise<{ page?: string }> }) {
+  await requirePermission("view");
   const page = Math.max(1, Number((await searchParams).page) || 1);
   const where = { status: "COMPLETE" as const };
   const [rows, total] = await Promise.all([

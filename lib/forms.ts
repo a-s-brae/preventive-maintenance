@@ -127,3 +127,34 @@ export const completeSchema = z.object({
   notes: optText,
   assetUp: z.preprocess((v) => v === "on", z.boolean()),
 });
+
+const positive = z.coerce.number({ message: "Enter a number" }).positive("Must be more than 0");
+
+export const partSchema = z.object({
+  name: reqText,
+  partNumber: optText,
+  description: optText,
+  unit: z.preprocess(blankToUndef, z.string().trim().max(20).default("ea")),
+  minQuantity: optNumber,
+  unitCost: optNumber,
+  storageLocation: optText,
+  vendor: optText,
+  notes: optText,
+  /** Only used when creating: stock on hand to start with. */
+  quantity: optNumber,
+  active: z.preprocess((v) => v === undefined || v === "on" || v === "true", z.boolean()),
+});
+
+export const restockSchema = z.object({ quantity: positive, unitCost: optNumber, note: optText });
+export const countSchema = z.object({ counted: z.coerce.number({ message: "Enter the count" }).nonnegative(), note: optText });
+export const usePartSchema = z.object({ partId: z.string().min(1, "Pick a part"), quantity: positive });
+
+export const laborSchema = z
+  .object({
+    hours: z.preprocess(blankToUndef, z.coerce.number().int().min(0).max(24).optional()),
+    minutes: z.preprocess(blankToUndef, z.coerce.number().int().min(0).max(59).optional()),
+    date: dateOnly,
+    note: optText,
+  })
+  .refine((l) => (l.hours ?? 0) * 60 + (l.minutes ?? 0) > 0, { message: "Enter the time spent", path: ["minutes"] })
+  .transform((l) => ({ ...l, total: (l.hours ?? 0) * 60 + (l.minutes ?? 0) }));

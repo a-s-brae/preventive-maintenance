@@ -1,3 +1,4 @@
+import { requirePermission } from "@/auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
@@ -8,6 +9,12 @@ import { userLabel } from "@/lib/queries";
 import { describeInterval } from "@/lib/schedule";
 import { TYPE_LABEL, woNumber, workOrderDue } from "@/lib/work-orders";
 import { formatDateTime, requestNumber } from "@/lib/downtime";
+import { formatMinutes, totalMinutes } from "@/lib/labor";
+import { formatMoney, partsCost } from "@/lib/parts";
+import { can } from "@/lib/permissions";
+import { Attachments } from "@/components/attachments";
+import { WorkOrderLabor } from "@/components/wo-labor";
+import { WorkOrderParts } from "@/components/wo-parts";
 import { ChecklistResults } from "@/components/checklist-results";
 import { CompleteForm } from "@/components/complete-form";
 import { ButtonLink, Card, PriorityText, StatusBadge, WoDueText, WoStatusBadge } from "@/components/ui";
@@ -15,6 +22,9 @@ import { ButtonLink, Card, PriorityText, StatusBadge, WoDueText, WoStatusBadge }
 export const dynamic = "force-dynamic";
 
 export default async function WorkOrderPage({ params }: { params: Promise<{ id: string }> }) {
+  const me = await requirePermission("view");
+  const canWork = can(me.role, "work");
+  const canManage = can(me.role, "manage");
   const { id } = await params;
   const wo = await db.workOrder.findUnique({
     where: { id },
@@ -25,9 +35,15 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
       createdBy: true,
       completedBy: true,
       request: { include: { requestedBy: true } },
+      partUsages: { include: { part: true, usedBy: true }, orderBy: { createdAt: "asc" } },
+      labor: { include: { user: true }, orderBy: { startedAt: "asc" } },
+      attachments: { include: { uploadedBy: true }, orderBy: { createdAt: "asc" } },
     },
   });
   if (!wo) notFound();
+  const parts = canWork
+    ? await db.part.findMany({ where: { active: true }, orderBy: { name: "asc" }, select: { id: true, name: true, partNumber: true, quantity: true, unit: true } })
+    : [];
   const due = workOrderDue(wo, wo.asset.currentMeter, wo.pmTask?.usageEvery ?? null);
   const complete = wo.status === "COMPLETE";
   const checklist = parseChecklist(wo.checklist);
@@ -67,9 +83,13 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
       ? ([
           [
             "PM schedule",
-            <Link key="pm" href={`/tasks/${wo.pmTask.id}/edit`} className="link">
-              {describeInterval(wo.pmTask, wo.asset.meterUnit)}
-            </Link>,
+            canManage ? (
+              <Link key="pm" href={`/tasks/${wo.pmTask.id}/edit`} className="link">
+                {describeInterval(wo.pmTask, wo.asset.meterUnit)}
+              </Link>
+            ) : (
+              describeInterval(wo.pmTask, wo.asset.meterUnit)
+            ),
           ],
         ] as [string, React.ReactNode][])
       : []),
@@ -89,6 +109,8 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
     ...(wo.startedAt ? ([["Started", formatDate(wo.startedAt)]] as [string, React.ReactNode][]) : []),
     ...(complete ? ([["Completed", `${formatDate(wo.completedAt)} by ${userLabel(wo.completedBy)}`]] as [string, React.ReactNode][]) : []),
     ...(wo.meterReading != null ? ([["Meter at completion", `${formatNumber(wo.meterReading)} ${wo.asset.meterUnit ?? ""}`]] as [string, React.ReactNode][]) : []),
+    ["Time logged", formatMinutes(totalMinutes(wo.labor))],
+    ["Parts cost", formatMoney(partsCost(wo.partUsages))],
   ];
 
   return (
@@ -101,14 +123,17 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">{wo.title}</h1>
         </div>
         <div className="flex flex-wrap gap-2">
-          {wo.status === "OPEN" && statusButton("IN_PROGRESS", "Start work", true)}
-          {wo.status === "IN_PROGRESS" && statusButton("ON_HOLD", "Put on hold")}
-          {wo.status === "ON_HOLD" && statusButton("IN_PROGRESS", "Resume", true)}
-          {!complete && (
+          {canWork && wo.status === "OPEN" && statusButton("IN_PROGRESS", "Start work", true)}
+          {canWork && wo.status === "IN_PROGRESS" && statusButton("ON_HOLD", "Put on hold")}
+          {canWork && wo.status === "ON_HOLD" && statusButton("IN_PROGRESS", "Resume", true)}
+          {canWork && !complete && (
             <ButtonLink href={`/work-orders/${wo.id}/edit`} variant="secondary">
               Edit
             </ButtonLink>
           )}
+          <a href={`/print/work-orders/${wo.id}`} target="_blank" rel="noreferrer" className="btn-secondary">
+            Print
+          </a>
         </div>
       </div>
 
@@ -126,6 +151,9 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
               <p className="text-sm whitespace-pre-wrap">{wo.description ?? wo.pmTask?.instructions}</p>
             </Card>
           )}
+          <Card title="Time">
+            <WorkOrderLabor workOrderId={wo.id} entries={wo.labor} meId={me.id} canWork={canWork} canManage={canManage} open={!complete} />
+          </Card>
           {complete ? (
             <Card title="Results">
               <div className="space-y-4">
@@ -137,7 +165,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                 )}
               </div>
             </Card>
-          ) : (
+          ) : !canWork ? null : (
             <Card title="Complete this work order">
               <CompleteForm
                 action={completeWorkOrder.bind(null, wo.id)}
@@ -151,6 +179,17 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
               />
             </Card>
           )}
+          <Card title="Parts used">
+            <WorkOrderParts workOrderId={wo.id} usages={wo.partUsages} parts={parts} canEdit={canWork} />
+          </Card>
+          <Card title="Photos & files">
+            <Attachments
+              attachments={wo.attachments}
+              target={{ workOrderId: wo.id }}
+              canUpload={canWork}
+              canDelete={(a) => canWork && (a.uploadedById === me.id || canManage)}
+            />
+          </Card>
         </div>
         <Card title="Details">
           <dl className="space-y-2.5 text-sm">

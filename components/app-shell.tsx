@@ -4,11 +4,22 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 
-type Counts = { overdue: number; mine: number; pendingRequests: number };
+type Counts = { overdue: number; mine: number; pendingRequests: number; lowStock: number };
+type Role = "ADMIN" | "TECH" | "REQUESTER";
 
 type NavItem = { href: string; label: string; icon: keyof typeof ICONS; badge?: { count: number; tone: "red" | "blue" | "amber"; title: string } };
 
-function navSections(counts: Counts): { title?: string; items: NavItem[] }[] {
+function navSections(counts: Counts, role: Role): { title?: string; items: NavItem[] }[] {
+  if (role === "REQUESTER") {
+    return [
+      {
+        items: [
+          { href: "/", label: "Home", icon: "home" },
+          { href: "/requests", label: "My requests", icon: "inbox" },
+        ],
+      },
+    ];
+  }
   return [
     { items: [{ href: "/", label: "Dashboard", icon: "home" }] },
     {
@@ -26,23 +37,27 @@ function navSections(counts: Counts): { title?: string; items: NavItem[] }[] {
       items: [
         { href: "/assets", label: "Assets", icon: "cube" },
         { href: "/locations", label: "Locations", icon: "pin" },
+        { href: "/parts", label: "Parts", icon: "box", badge: { count: counts.lowStock, tone: "amber", title: "low or out of stock" } },
       ],
     },
     {
       title: "Planning",
       items: [{ href: "/pm", label: "PM schedules", icon: "repeat" }],
     },
+    ...(role === "ADMIN" ? [{ title: "Admin", items: [{ href: "/people", label: "People", icon: "users" } as NavItem] }] : []),
   ];
 }
 
 /** Sidebar on large screens; a top bar with a slide-out menu on phones and tablets. */
 export function AppShell({
   email,
+  role,
   counts,
   signOutAction,
   children,
 }: {
   email: string;
+  role: Role;
   counts: Counts;
   signOutAction: () => Promise<void>;
   children: React.ReactNode;
@@ -71,8 +86,8 @@ export function AppShell({
           Report a problem
         </Link>
       </div>
-      <Suspense fallback={<Nav counts={counts} />}>
-        <ActiveNav counts={counts} />
+      <Suspense fallback={<Nav counts={counts} role={role} />}>
+        <ActiveNav counts={counts} role={role} />
       </Suspense>
       <form action={signOutAction} className="border-t border-white/10 px-5 py-4 text-sm">
         <div className="truncate text-slate-400" title={email}>
@@ -96,7 +111,7 @@ export function AppShell({
         <Link href="/" className="font-semibold">
           PM System
         </Link>
-        {counts.overdue > 0 && (
+        {role !== "REQUESTER" && counts.overdue > 0 && (
           <Link href="/work-orders?due=overdue" className="ml-auto rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-medium">
             {counts.overdue} overdue
           </Link>
@@ -122,7 +137,7 @@ export function AppShell({
   );
 }
 
-function ActiveNav({ counts }: { counts: Counts }) {
+function ActiveNav({ counts, role }: { counts: Counts; role: Role }) {
   const pathname = usePathname();
   const params = useSearchParams();
   const isActive = (href: string) => {
@@ -135,13 +150,13 @@ function ActiveNav({ counts }: { counts: Counts }) {
     if (path === "/work-orders") return /^\/work-orders\/(?!calendar)/.test(pathname);
     return pathname === path || pathname.startsWith(`${path}/`) || (path === "/assets" && pathname.startsWith("/tasks/"));
   };
-  return <Nav counts={counts} isActive={isActive} />;
+  return <Nav counts={counts} role={role} isActive={isActive} />;
 }
 
-function Nav({ counts, isActive = () => false }: { counts: Counts; isActive?: (href: string) => boolean }) {
+function Nav({ counts, role, isActive = () => false }: { counts: Counts; role: Role; isActive?: (href: string) => boolean }) {
   return (
     <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4" aria-label="Main">
-      {navSections(counts).map((section, i) => (
+      {navSections(counts, role).map((section, i) => (
         <div key={i}>
           {section.title && <div className="mb-1 px-2 text-xs font-medium tracking-wide text-slate-400 uppercase">{section.title}</div>}
           <ul className="space-y-0.5">
@@ -191,6 +206,8 @@ const ICONS = {
   inbox: "M4 13h4l2 3h4l2-3h4M4 13l2-8h12l2 8v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z",
   pin: "M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12m0-9a3 3 0 1 0 0-6 3 3 0 0 0 0 6",
   alert: "M12 9v4m0 4h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0",
+  box: "M21 8 12 3 3 8m18 0v8l-9 5m9-13-9 5m0 8-9-5V8m9 13v-8M3 8l9 5",
+  users: "M16 19a4 4 0 0 0-8 0m4-7a3 3 0 1 0 0-6 3 3 0 0 0 0 6m6 7a3 3 0 0 0-2-2.8M17 6.2a3 3 0 0 1 0 5.6M4 19a3 3 0 0 1 2-2.8M7 6.2a3 3 0 0 0 0 5.6",
   menu: "M4 6h16M4 12h16M4 18h16",
   close: "M6 6l12 12M18 6 6 18",
 } as const;

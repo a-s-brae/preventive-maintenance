@@ -1,3 +1,4 @@
+import { requirePermission } from "@/auth";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { saveTask } from "@/lib/actions";
@@ -6,6 +7,7 @@ import { TaskForm } from "@/components/task-form";
 import { Card, PageHeader } from "@/components/ui";
 
 export default async function NewTaskPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePermission("manage");
   const { id } = await params;
   const [asset, users] = await Promise.all([db.asset.findUnique({ where: { id } }), getUsers()]);
   if (!asset) notFound();

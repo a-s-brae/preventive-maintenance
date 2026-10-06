@@ -169,6 +169,19 @@ export async function loadSampleData(tx: Prisma.TransactionClient): Promise<bool
     },
   });
 
+  // A few spares, one of them already running low.
+  const parts = [
+    { name: "Compressor oil filter", partNumber: "CF-2110", quantity: 3, minQuantity: 2, unitCost: 24.5, storageLocation: "Crib A, bin 4", vendor: "Grainger" },
+    { name: "Compressor oil (1 gal)", partNumber: "SC-ULTRA-1G", unit: "gal", quantity: 6, minQuantity: 2, unitCost: 41, storageLocation: "Crib A, shelf 2", vendor: "Grainger" },
+    { name: "Forklift hydraulic filter", partNumber: "TY-67501", quantity: 1, minQuantity: 2, unitCost: 32.75, storageLocation: "Crib B, bin 9" },
+    { name: "HVAC filter 20×25×1", partNumber: "FLT-20251", quantity: 12, minQuantity: 4, unitCost: 7.2, storageLocation: "Crib B, shelf 1", vendor: "Filters Fast" },
+  ];
+  for (const { quantity, ...p } of parts) {
+    const part = await tx.part.create({ data: p });
+    await tx.stockTransaction.create({ data: { partId: part.id, change: quantity, quantityAfter: quantity, reason: "ADJUST", unitCost: p.unitCost, note: "Starting stock" } });
+    await tx.part.update({ where: { id: part.id }, data: { quantity } });
+  }
+
   const dryer = await tx.asset.findFirstOrThrow({ where: { assetTag: "AD-001" } });
   await tx.request.create({
     data: {

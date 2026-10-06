@@ -1,3 +1,4 @@
+import { requirePermission } from "@/auth";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { deleteAsset, saveAsset } from "@/lib/actions";
@@ -8,6 +9,7 @@ import { ConfirmButton } from "@/components/form";
 import { Card, PageHeader } from "@/components/ui";
 
 export default async function EditAssetPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePermission("manage");
   const { id } = await params;
   const [asset, locations, tree] = await Promise.all([db.asset.findUnique({ where: { id } }), getLocationTree(), getAssetTree()]);
   if (!asset) notFound();

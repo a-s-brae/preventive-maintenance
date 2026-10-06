@@ -3,14 +3,24 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
-import { requireUser } from "@/auth";
+import { requirePermission } from "@/auth";
 import { db } from "@/lib/db";
 import { checklistFromForm, draftAnswers, NOTE_MAX, parseAnswer, parseChecklist, resultsFromForm, type ChecklistResult } from "@/lib/checklist";
 import { endDowntime, startDowntime } from "@/lib/downtime";
+import { headers } from "next/headers";
+import { sendDigests } from "@/lib/digest";
+import { minutesBetween, runningKey } from "@/lib/labor";
+import { adjustStock, StockError } from "@/lib/parts";
+import { can } from "@/lib/permissions";
 import {
   approveSchema,
   assetSchema,
   completeSchema,
+  countSchema,
+  laborSchema,
+  partSchema,
+  restockSchema,
+  usePartSchema,
   downSchema,
   firstError,
   locationSchema,
@@ -35,7 +45,7 @@ function isUniqueViolation(e: unknown): boolean {
 // ─── Assets ─────────────────────────────────────────────────────────────────
 
 export async function saveAsset(assetId: string | null, _prev: FormState, fd: FormData): Promise<FormState> {
-  await requireUser();
+  await requirePermission("manage");
   const parsed = assetSchema.safeParse(fields(fd));
   if (!parsed.success) return { error: firstError(parsed.error) };
   const data = {
@@ -65,14 +75,14 @@ export async function saveAsset(assetId: string | null, _prev: FormState, fd: Fo
 }
 
 export async function loadSampleAssets() {
-  await requireUser();
+  await requirePermission("manage");
   await db.$transaction((tx) => loadSampleData(tx));
   await syncPmWorkOrders(db);
   revalidatePath("/", "layout");
 }
 
 export async function deleteAsset(assetId: string) {
-  await requireUser();
+  await requirePermission("manage");
   await db.asset.delete({ where: { id: assetId } });
   revalidatePath("/", "layout");
   redirect("/assets");
@@ -97,7 +107,7 @@ async function applyMeterReading(tx: Tx, assetId: string, value: number, userId:
 class MeterError extends Error {}
 
 export async function recordMeter(assetId: string, _prev: FormState, fd: FormData): Promise<FormState> {
-  const user = await requireUser();
+  const user = await requirePermission("work");
   const value = optNumber.safeParse(fd.get("value"));
   if (!value.success || value.data == null) return { error: "Enter a meter reading" };
   try {
@@ -117,7 +127,7 @@ export async function saveTask(
   _prev: FormState,
   fd: FormData,
 ): Promise<FormState> {
-  await requireUser();
+  await requirePermission("manage");
   const parsed = taskSchema.safeParse(fields(fd));
   if (!parsed.success) return { error: firstError(parsed.error) };
   const checklist = checklistFromForm(fd.get("checklist"));
@@ -156,7 +166,7 @@ export async function saveTask(
 }
 
 export async function deleteTask(taskId: string) {
-  await requireUser();
+  await requirePermission("manage");
   const task = await db.$transaction(async (tx) => {
     // Drop its not-yet-started work order; keep any that are underway.
     await tx.workOrder.deleteMany({ where: { openForTaskId: taskId, status: "OPEN" } });
@@ -169,7 +179,7 @@ export async function deleteTask(taskId: string) {
 
 /** Create a PM schedule's work order now, before it comes due. */
 export async function startPmNow(taskId: string) {
-  await requireUser();
+  await requirePermission("work");
   const wo = await openPmWorkOrder(db, taskId);
   revalidatePath("/", "layout");
   redirect(`/work-orders/${wo.id}`);
@@ -178,7 +188,7 @@ export async function startPmNow(taskId: string) {
 // ─── Work orders ────────────────────────────────────────────────────────────
 
 export async function saveWorkOrder(workOrderId: string | null, _prev: FormState, fd: FormData): Promise<FormState> {
-  const user = await requireUser();
+  const user = await requirePermission("work");
   const parsed = workOrderSchema.safeParse(fields(fd));
   if (!parsed.success) return { error: firstError(parsed.error) };
   const w = parsed.data;
@@ -208,7 +218,7 @@ export async function saveWorkOrder(workOrderId: string | null, _prev: FormState
 }
 
 export async function setWorkOrderStatus(workOrderId: string, status: "OPEN" | "IN_PROGRESS" | "ON_HOLD") {
-  await requireUser();
+  await requirePermission("work");
   const wo = await db.workOrder.findUniqueOrThrow({ where: { id: workOrderId } });
   if (wo.status === "COMPLETE") return;
   await db.workOrder.update({
@@ -227,7 +237,7 @@ export async function saveChecklistAnswer(
   raw: string,
   note: string,
 ): Promise<{ error?: string; started?: boolean }> {
-  await requireUser();
+  await requirePermission("work");
   try {
     return await db.$transaction(async (tx) => {
       // Lock the row: two people answering different items at once must not
@@ -266,7 +276,7 @@ export async function saveChecklistAnswer(
 /** Complete a work order. For PM work orders this also resets the schedule,
  *  and creates the next work order right away if it's already due. */
 export async function completeWorkOrder(workOrderId: string, _prev: FormState, fd: FormData): Promise<FormState> {
-  const user = await requireUser();
+  const user = await requirePermission("work");
   const parsed = completeSchema.safeParse(fields(fd));
   if (!parsed.success) return { error: firstError(parsed.error) };
   const { performedAt, meterReading, notes, assetUp } = parsed.data;
@@ -277,6 +287,12 @@ export async function completeWorkOrder(workOrderId: string, _prev: FormState, f
       if (wo.status === "COMPLETE") throw new FormError("This work order is already complete");
       // Back up now if done today; a back-dated completion ends the downtime on that day.
       if (assetUp) await endDowntime(tx, wo.assetId, user.id, isToday(performedAt) ? new Date() : performedAt);
+      // Stop anyone's timer still running on it.
+      const running = await tx.laborEntry.findMany({ where: { workOrderId: wo.id, endedAt: null } });
+      const now = new Date();
+      for (const e of running) {
+        await tx.laborEntry.update({ where: { id: e.id }, data: { endedAt: now, minutes: minutesBetween(e.startedAt, now), runningKey: null } });
+      }
 
       const { results, error } = resultsFromForm(parseChecklist(wo.checklist), fd);
       if (error) throw new FormError(error);
@@ -326,7 +342,7 @@ class FormError extends Error {}
 
 /** Only hand-made work orders can be deleted; PM ones come back while the PM is due. */
 export async function deleteWorkOrder(workOrderId: string) {
-  await requireUser();
+  await requirePermission("manage");
   const wo = await db.workOrder.findUniqueOrThrow({ where: { id: workOrderId } });
   if (wo.type === "PM") return;
   await db.workOrder.delete({ where: { id: workOrderId } });
@@ -339,7 +355,7 @@ const isToday = (d: Date) => d.toISOString().slice(0, 10) === new Date().toISOSt
 // ─── Locations ──────────────────────────────────────────────────────────────
 
 export async function saveLocation(locationId: string | null, _prev: FormState, fd: FormData): Promise<FormState> {
-  await requireUser();
+  await requirePermission("manage");
   const parsed = locationSchema.safeParse(fields(fd));
   if (!parsed.success) return { error: firstError(parsed.error) };
   const data = { name: parsed.data.name, parentId: parsed.data.parentId ?? null, notes: parsed.data.notes ?? null };
@@ -357,7 +373,7 @@ export async function saveLocation(locationId: string | null, _prev: FormState, 
 
 /** Delete an empty location. Ones with sub-locations or assets must be emptied first. */
 export async function deleteLocation(locationId: string, _prev: FormState, _fd: FormData): Promise<FormState> {
-  await requireUser();
+  await requirePermission("manage");
   const loc = await db.location.findUniqueOrThrow({ where: { id: locationId }, include: { _count: { select: { children: true, assets: true } } } });
   if (loc._count.children || loc._count.assets) {
     return { error: `Move its ${loc._count.children} sub-location(s) and ${loc._count.assets} asset(s) somewhere else first` };
@@ -370,7 +386,7 @@ export async function deleteLocation(locationId: string, _prev: FormState, _fd: 
 // ─── Downtime ───────────────────────────────────────────────────────────────
 
 export async function markAssetDown(assetId: string, _prev: FormState, fd: FormData): Promise<FormState> {
-  const user = await requireUser();
+  const user = await requirePermission("work");
   const parsed = downSchema.safeParse(fields(fd));
   if (!parsed.success) return { error: firstError(parsed.error) };
   await startDowntime(db, { assetId, userId: user.id, reason: parsed.data.reason });
@@ -379,7 +395,7 @@ export async function markAssetDown(assetId: string, _prev: FormState, fd: FormD
 }
 
 export async function markAssetUp(assetId: string) {
-  const user = await requireUser();
+  const user = await requirePermission("work");
   await endDowntime(db, assetId, user.id);
   revalidatePath("/", "layout");
 }
@@ -387,7 +403,7 @@ export async function markAssetUp(assetId: string) {
 // ─── Requests ───────────────────────────────────────────────────────────────
 
 export async function createRequest(_prev: FormState, fd: FormData): Promise<FormState> {
-  const user = await requireUser();
+  const user = await requirePermission("report");
   const parsed = requestSchema.safeParse(fields(fd));
   if (!parsed.success) return { error: firstError(parsed.error) };
   const r = parsed.data;
@@ -415,7 +431,7 @@ export async function createRequest(_prev: FormState, fd: FormData): Promise<For
 
 /** Approve a request: create its work order and link any downtime to it. */
 export async function approveRequest(requestId: string, _prev: FormState, fd: FormData): Promise<FormState> {
-  const user = await requireUser();
+  const user = await requirePermission("review");
   const parsed = approveSchema.safeParse(fields(fd));
   if (!parsed.success) return { error: firstError(parsed.error) };
   const a = parsed.data;
@@ -460,7 +476,7 @@ export async function approveRequest(requestId: string, _prev: FormState, fd: Fo
 }
 
 export async function rejectRequest(requestId: string, _prev: FormState, fd: FormData): Promise<FormState> {
-  const user = await requireUser();
+  const user = await requirePermission("review");
   const parsed = rejectSchema.safeParse(fields(fd));
   if (!parsed.success) return { error: firstError(parsed.error) };
   const { count } = await db.request.updateMany({
@@ -470,4 +486,187 @@ export async function rejectRequest(requestId: string, _prev: FormState, fd: For
   if (count === 0) return { error: "This request has already been reviewed" };
   revalidatePath("/", "layout");
   redirect(`/requests/${requestId}`);
+}
+
+// ─── Parts & stock ──────────────────────────────────────────────────────────
+
+export async function savePart(partId: string | null, _prev: FormState, fd: FormData): Promise<FormState> {
+  const user = await requirePermission("manage");
+  const parsed = partSchema.safeParse(fields(fd));
+  if (!parsed.success) return { error: firstError(parsed.error) };
+  const { quantity, ...p } = parsed.data;
+  const data = {
+    ...p,
+    partNumber: p.partNumber ?? null,
+    description: p.description ?? null,
+    minQuantity: p.minQuantity ?? null,
+    unitCost: p.unitCost ?? null,
+    storageLocation: p.storageLocation ?? null,
+    vendor: p.vendor ?? null,
+    notes: p.notes ?? null,
+  };
+  let id: string;
+  try {
+    id = await db.$transaction(async (tx) => {
+      if (partId) return (await tx.part.update({ where: { id: partId }, data })).id;
+      const part = await tx.part.create({ data });
+      if (quantity) await adjustStock(tx, { partId: part.id, reason: "ADJUST", setTo: quantity, userId: user.id, note: "Starting stock" });
+      return part.id;
+    });
+  } catch (e) {
+    if (isUniqueViolation(e)) return { error: `Part number "${data.partNumber}" is already used by another part` };
+    throw e;
+  }
+  revalidatePath("/", "layout");
+  redirect(`/parts/${id}`);
+}
+
+export async function restockPart(partId: string, _prev: FormState, fd: FormData): Promise<FormState> {
+  const user = await requirePermission("work");
+  const parsed = restockSchema.safeParse(fields(fd));
+  if (!parsed.success) return { error: firstError(parsed.error) };
+  const r = parsed.data;
+  await db.$transaction((tx) =>
+    adjustStock(tx, { partId, reason: "RESTOCK", change: r.quantity, unitCost: r.unitCost ?? null, note: r.note ?? null, userId: user.id }),
+  );
+  revalidatePath("/", "layout");
+  return {};
+}
+
+/** Correct the stock after a physical count. */
+export async function countPart(partId: string, _prev: FormState, fd: FormData): Promise<FormState> {
+  const user = await requirePermission("work");
+  const parsed = countSchema.safeParse(fields(fd));
+  if (!parsed.success) return { error: firstError(parsed.error) };
+  await db.$transaction((tx) =>
+    adjustStock(tx, { partId, reason: "ADJUST", setTo: parsed.data.counted, note: parsed.data.note ?? "Counted", userId: user.id }),
+  );
+  revalidatePath("/", "layout");
+  return {};
+}
+
+/** Record parts used on a work order; they come out of stock. */
+export async function usePart(workOrderId: string, _prev: FormState, fd: FormData): Promise<FormState> {
+  const user = await requirePermission("work");
+  const parsed = usePartSchema.safeParse(fields(fd));
+  if (!parsed.success) return { error: firstError(parsed.error) };
+  const { partId, quantity } = parsed.data;
+  try {
+    await db.$transaction(async (tx) => {
+      const part = await adjustStock(tx, { partId, reason: "USED", change: -quantity, workOrderId, userId: user.id });
+      await tx.partUsage.create({ data: { workOrderId, partId, quantity, unitCost: part.unitCost, usedById: user.id } });
+    });
+  } catch (e) {
+    if (e instanceof StockError) return { error: e.message };
+    throw e;
+  }
+  revalidatePath("/", "layout");
+  return {};
+}
+
+/** Take a part line off a work order and put the parts back in stock. */
+export async function removePartUsage(usageId: string) {
+  const user = await requirePermission("work");
+  await db.$transaction(async (tx) => {
+    const usage = await tx.partUsage.delete({ where: { id: usageId } });
+    await adjustStock(tx, { partId: usage.partId, reason: "RETURNED", change: usage.quantity, workOrderId: usage.workOrderId, userId: user.id });
+  });
+  revalidatePath("/", "layout");
+}
+
+// ─── Labor ──────────────────────────────────────────────────────────────────
+
+/** Start my timer on a work order (and start the work order). */
+export async function startTimer(workOrderId: string) {
+  const user = await requirePermission("work");
+  await db.$transaction(async (tx) => {
+    const wo = await tx.workOrder.findUniqueOrThrow({ where: { id: workOrderId } });
+    if (wo.status === "COMPLETE") return;
+    await tx.laborEntry.createMany({
+      data: [{ workOrderId, userId: user.id, startedAt: new Date(), runningKey: runningKey(user.id, workOrderId) }],
+      skipDuplicates: true,
+    });
+    if (wo.status !== "IN_PROGRESS") {
+      await tx.workOrder.update({ where: { id: wo.id }, data: { status: "IN_PROGRESS", startedAt: wo.startedAt ?? new Date() } });
+    }
+  });
+  revalidatePath("/", "layout");
+}
+
+export async function stopTimer(workOrderId: string) {
+  const user = await requirePermission("work");
+  const entry = await db.laborEntry.findUnique({ where: { runningKey: runningKey(user.id, workOrderId) } });
+  if (entry) {
+    const now = new Date();
+    await db.laborEntry.update({ where: { id: entry.id }, data: { endedAt: now, minutes: minutesBetween(entry.startedAt, now), runningKey: null } });
+  }
+  revalidatePath("/", "layout");
+}
+
+/** Log time after the fact. */
+export async function addLabor(workOrderId: string, _prev: FormState, fd: FormData): Promise<FormState> {
+  const user = await requirePermission("work");
+  const parsed = laborSchema.safeParse(fields(fd));
+  if (!parsed.success) return { error: firstError(parsed.error) };
+  const { date, total, note } = parsed.data;
+  await db.laborEntry.create({
+    data: { workOrderId, userId: user.id, startedAt: date, endedAt: new Date(date.getTime() + total * 60_000), minutes: total, note: note ?? null },
+  });
+  revalidatePath("/", "layout");
+  return {};
+}
+
+/** People can remove their own time entries; admins can remove anyone's. */
+export async function deleteLabor(entryId: string) {
+  const user = await requirePermission("work");
+  const entry = await db.laborEntry.findUniqueOrThrow({ where: { id: entryId } });
+  if (entry.userId !== user.id && !can(user.role, "manage")) return;
+  await db.laborEntry.delete({ where: { id: entryId } });
+  revalidatePath("/", "layout");
+}
+
+// ─── Attachments ────────────────────────────────────────────────────────────
+
+/** Uploaders can delete their own files; admins can delete any. */
+export async function deleteAttachment(attachmentId: string) {
+  const user = await requirePermission("work");
+  const a = await db.attachment.findUniqueOrThrow({ where: { id: attachmentId } });
+  if (a.uploadedById !== user.id && !can(user.role, "manage")) return;
+  await db.attachment.delete({ where: { id: attachmentId } });
+  revalidatePath("/", "layout");
+}
+
+// ─── People ─────────────────────────────────────────────────────────────────
+
+export async function updatePerson(userId: string, _prev: FormState, fd: FormData): Promise<FormState> {
+  const me = await requirePermission("people");
+  const role = String(fd.get("role") ?? "");
+  if (role !== "ADMIN" && role !== "TECH" && role !== "REQUESTER") return { error: "Pick a role" };
+  const active = fd.get("active") === "on";
+  const emailDigest = fd.get("emailDigest") === "on";
+  const name = String(fd.get("name") ?? "").trim().slice(0, 100) || null;
+
+  const losingAdmin = role !== "ADMIN" || !active;
+  if (losingAdmin) {
+    const target = await db.user.findUniqueOrThrow({ where: { id: userId } });
+    const admins = await db.user.count({ where: { role: "ADMIN", active: true } });
+    if (target.role === "ADMIN" && target.active && admins <= 1) return { error: "There has to be at least one active admin" };
+  }
+  await db.user.update({ where: { id: userId }, data: { role, active, emailDigest, name } });
+  // Deactivating signs them out everywhere.
+  if (!active) await db.session.deleteMany({ where: { userId } });
+  revalidatePath("/", "layout");
+  // Someone who just took away their own admin role can't stay on the people page.
+  if (userId === me.id && role !== "ADMIN") redirect("/");
+  return {};
+}
+
+/** Send everyone's daily email now (normally it goes out each weekday morning). */
+export async function sendDigestNow() {
+  await requirePermission("people");
+  const h = await headers();
+  const base = process.env.APP_URL ?? `${h.get("x-forwarded-proto") ?? "http"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
+  const r = await sendDigests(base);
+  const qs = new URLSearchParams({ sent: String(r.sent), skipped: String(r.skipped), ...(r.errors.length && { error: r.errors[0] }) });
+  redirect(`/people?${qs}`);
 }

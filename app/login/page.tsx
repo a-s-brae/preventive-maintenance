@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
 import { auth, isAllowedEmail, localLogin, signIn, takeLocalLink } from "@/auth";
 import { LoginForm, type LoginState } from "@/components/login-form";
+import { db } from "@/lib/db";
 
 const ERRORS: Record<string, string> = {
   AccessDenied: "That email address isn't allowed. Use your company email.",
@@ -19,6 +20,8 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     "use server";
     const email = String(fd.get("email") ?? "").trim().toLowerCase();
     if (!isAllowedEmail(email)) return { error: ERRORS.AccessDenied };
+    const existing = await db.user.findUnique({ where: { email }, select: { active: true } });
+    if (existing && !existing.active) return { error: "Your account has been deactivated. Ask an admin if you need access again." };
     try {
       if (localLogin) {
         await signIn("resend", { email, redirect: false, redirectTo: "/" });

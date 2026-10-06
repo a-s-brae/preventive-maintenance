@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* Grid items default to min-width: auto, so one wide table (even inside an
+   overflow-x-auto wrapper) would stretch its whole column past a phone screen. */
+.grid > * {
+  min-width: 0;
+}
+
 @layer components {
   .input {
     @apply block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm
@@ -32,5 +38,14 @@
   }
   .link {
     @apply font-medium text-sky-700 hover:underline;
+  }
+}
+
+@media print {
+  body {
+    background: white;
+  }
+  @page {
+    margin: 0.5in;
   }
 }

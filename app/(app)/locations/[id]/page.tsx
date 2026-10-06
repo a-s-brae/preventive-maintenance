@@ -1,6 +1,8 @@
+import { requirePermission } from "@/auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
+import { can } from "@/lib/permissions";
 import { getLocationTree, getOpenWorkOrders } from "@/lib/queries";
 import { descendantIds, pathLabel } from "@/lib/tree";
 import { OpenWorkOrderList } from "@/components/work-order-table";
@@ -9,6 +11,7 @@ import { ButtonLink, Card, DownBadge, Empty } from "@/components/ui";
 export const dynamic = "force-dynamic";
 
 export default async function LocationPage({ params }: { params: Promise<{ id: string }> }) {
+  const me = await requirePermission("view");
   const { id } = await params;
   const tree = await getLocationTree();
   const node = tree.find((l) => l.id === id);
@@ -33,7 +36,7 @@ export default async function LocationPage({ params }: { params: Promise<{ id: s
           <h1 className="text-2xl font-semibold tracking-tight">{node.name}</h1>
           {location?.notes && <p className="mt-1 max-w-2xl text-sm whitespace-pre-wrap text-slate-600">{location.notes}</p>}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className={`flex flex-wrap gap-2 ${can(me.role, "manage") ? "" : "hidden"}`}>
           <ButtonLink href={`/locations/new?parentId=${id}`} variant="secondary">
             + Location inside
           </ButtonLink>

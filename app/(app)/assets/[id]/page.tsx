@@ -1,3 +1,4 @@
+import { requirePermission } from "@/auth";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Prisma } from "@prisma/client";
@@ -9,6 +10,8 @@ import { getLocationTree, getOpenWorkOrders, getPmSchedules, userLabel, workOrde
 import { describeInterval } from "@/lib/schedule";
 import { pathLabel } from "@/lib/tree";
 import { woNumber } from "@/lib/work-orders";
+import { can } from "@/lib/permissions";
+import { Attachments } from "@/components/attachments";
 import { DownForm } from "@/components/down-form";
 import { MeterForm } from "@/components/meter-form";
 import { CompletedWorkOrderTable, OpenWorkOrderList } from "@/components/work-order-table";
@@ -19,6 +22,9 @@ export const dynamic = "force-dynamic";
 const DAY_MS = 86_400_000;
 
 export default async function AssetPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
+  const me = await requirePermission("view");
+  const canWork = can(me.role, "work");
+  const canManage = can(me.role, "manage");
   const [{ id }, { tab: rawTab }] = await Promise.all([params, searchParams]);
   const asset = await db.asset.findUnique({
     where: { id },
@@ -30,7 +36,7 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
         take: 200,
         include: { workOrder: true, request: true, startedBy: true, endedBy: true },
       },
-      _count: { select: { workOrders: { where: { status: { not: "COMPLETE" } } }, tasks: { where: { active: true } } } },
+      _count: { select: { workOrders: { where: { status: { not: "COMPLETE" } } }, tasks: { where: { active: true } }, attachments: true } },
     },
   });
   if (!asset) notFound();
@@ -40,6 +46,7 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
     { key: "work-orders", label: "Work orders", count: asset._count.workOrders },
     { key: "pm", label: "PM schedules", count: asset._count.tasks },
     { key: "downtime", label: "Downtime" },
+    { key: "files", label: "Files", count: asset._count.attachments },
     ...(asset.meterUnit ? [{ key: "meter", label: "Meter" }] : []),
   ];
   const tab = tabs.some((t) => t.key === rawTab) ? rawTab! : "overview";
@@ -80,12 +87,19 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
             <ButtonLink href={`/requests/new?assetId=${asset.id}`} variant="secondary">
               Report a problem
             </ButtonLink>
-            <ButtonLink href={`/work-orders/new?assetId=${asset.id}`} variant="secondary">
-              + Work order
-            </ButtonLink>
-            <ButtonLink href={`/assets/${asset.id}/edit`} variant="secondary">
-              Edit
-            </ButtonLink>
+            {canWork && (
+              <ButtonLink href={`/work-orders/new?assetId=${asset.id}`} variant="secondary">
+                + Work order
+              </ButtonLink>
+            )}
+            <a href={`/print/assets/${asset.id}`} target="_blank" rel="noreferrer" className="btn-secondary">
+              Print history
+            </a>
+            {canManage && (
+              <ButtonLink href={`/assets/${asset.id}/edit`} variant="secondary">
+                Edit
+              </ButtonLink>
+            )}
           </div>
         </div>
       </div>
@@ -106,18 +120,20 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
                 </>
               )}
             </div>
-            <form action={markAssetUp.bind(null, asset.id)}>
-              <button type="submit" className="btn-primary">
-                Mark back up
-              </button>
-            </form>
+            {canWork && (
+              <form action={markAssetUp.bind(null, asset.id)}>
+                <button type="submit" className="btn-primary">
+                  Mark back up
+                </button>
+              </form>
+            )}
           </>
         ) : (
           <>
             <span className="text-slate-600">
               Down {formatDuration(last30)} in the last 30 days{asset.downtimes.length ? "" : " (no downtime logged)"}.
             </span>
-            <DownForm action={markAssetDown.bind(null, asset.id)} />
+            {canWork && <DownForm action={markAssetDown.bind(null, asset.id)} />}
           </>
         )}
       </div>
@@ -137,18 +153,19 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
         ))}
       </nav>
 
-      {tab === "overview" && <Overview asset={asset} locationLabel={pathLabel(location)} />}
+      {tab === "overview" && <Overview asset={asset} locationLabel={pathLabel(location)} canManage={canManage} canWork={canWork} />}
       {tab === "work-orders" && <WorkOrdersTab assetId={asset.id} />}
-      {tab === "pm" && <PmTab assetId={asset.id} meterUnit={asset.meterUnit} assetActive={asset.status === "ACTIVE"} />}
+      {tab === "pm" && <PmTab assetId={asset.id} meterUnit={asset.meterUnit} assetActive={asset.status === "ACTIVE"} canManage={canManage} canWork={canWork} />}
       {tab === "downtime" && <DowntimeTab downtimes={asset.downtimes} now={now} />}
-      {tab === "meter" && asset.meterUnit && <MeterTab assetId={asset.id} meterUnit={asset.meterUnit} currentMeter={asset.currentMeter} updatedAt={asset.meterUpdatedAt} />}
+      {tab === "meter" && asset.meterUnit && <MeterTab assetId={asset.id} meterUnit={asset.meterUnit} currentMeter={asset.currentMeter} updatedAt={asset.meterUpdatedAt} canWork={canWork} />}
+      {tab === "files" && <FilesTab assetId={asset.id} meId={me.id} canWork={canWork} canManage={canManage} />}
     </>
   );
 }
 
 type AssetWithRelations = Prisma.AssetGetPayload<{ include: { parent: true; children: { include: { downtimes: true } } } }>;
 
-async function Overview({ asset, locationLabel }: { asset: AssetWithRelations; locationLabel: string }) {
+async function Overview({ asset, locationLabel, canManage, canWork }: { asset: AssetWithRelations; locationLabel: string; canManage: boolean; canWork: boolean }) {
   const open = await getOpenWorkOrders({ assetId: asset.id });
   const details: [string, string | null][] = [
     ["Asset tag", asset.assetTag],
@@ -165,7 +182,16 @@ async function Overview({ asset, locationLabel }: { asset: AssetWithRelations; l
         <Card title="Open work orders">
           <OpenWorkOrderList rows={open} showAsset={false} empty="No open work orders." />
         </Card>
-        <Card title="Sub-assets" actions={<ButtonLink href={`/assets/new?parentId=${asset.id}${asset.locationId ? `&locationId=${asset.locationId}` : ""}`} variant="secondary">+ Sub-asset</ButtonLink>}>
+        <Card
+          title="Sub-assets"
+          actions={
+            canManage && (
+              <ButtonLink href={`/assets/new?parentId=${asset.id}${asset.locationId ? `&locationId=${asset.locationId}` : ""}`} variant="secondary">
+                + Sub-asset
+              </ButtonLink>
+            )
+          }
+        >
           {asset.children.length === 0 ? (
             <Empty>No sub-assets. Add the parts of this equipment you maintain separately (e.g. a dryer, chiller or robot).</Empty>
           ) : (
@@ -202,7 +228,7 @@ async function Overview({ asset, locationLabel }: { asset: AssetWithRelations; l
               </div>
               <div className="text-xs text-slate-500">Updated {formatDate(asset.meterUpdatedAt)}</div>
             </div>
-            <MeterForm action={recordMeter.bind(null, asset.id)} meterUnit={asset.meterUnit} />
+            {canWork && <MeterForm action={recordMeter.bind(null, asset.id)} meterUnit={asset.meterUnit} />}
           </Card>
         )}
       </div>
@@ -227,10 +253,22 @@ async function WorkOrdersTab({ assetId }: { assetId: string }) {
   );
 }
 
-async function PmTab({ assetId, meterUnit, assetActive }: { assetId: string; meterUnit: string | null; assetActive: boolean }) {
+async function PmTab({
+  assetId,
+  meterUnit,
+  assetActive,
+  canManage,
+  canWork,
+}: {
+  assetId: string;
+  meterUnit: string | null;
+  assetActive: boolean;
+  canManage: boolean;
+  canWork: boolean;
+}) {
   const schedules = await getPmSchedules({ assetId });
   return (
-    <Card title="PM schedules" actions={<ButtonLink href={`/assets/${assetId}/tasks/new`}>+ PM schedule</ButtonLink>}>
+    <Card title="PM schedules" actions={canManage && <ButtonLink href={`/assets/${assetId}/tasks/new`}>+ PM schedule</ButtonLink>}>
       {schedules.length === 0 ? (
         <Empty>No PM schedules yet.</Empty>
       ) : (
@@ -251,9 +289,13 @@ async function PmTab({ assetId, meterUnit, assetActive }: { assetId: string; met
                 <tr key={task.id} className={task.active ? "" : "opacity-50"}>
                   <td>{due ? <StatusBadge status={due.status} /> : <span className="text-xs text-slate-500">paused</span>}</td>
                   <td>
-                    <Link href={`/tasks/${task.id}/edit`} className="link">
-                      {task.title}
-                    </Link>
+                    {canManage ? (
+                      <Link href={`/tasks/${task.id}/edit`} className="link">
+                        {task.title}
+                      </Link>
+                    ) : (
+                      task.title
+                    )}
                     {Array.isArray(task.checklist) && task.checklist.length > 0 && <div className="text-xs text-slate-500">{task.checklist.length} checklist items</div>}
                   </td>
                   <td className="text-slate-600">{describeInterval(task, meterUnit)}</td>
@@ -266,7 +308,8 @@ async function PmTab({ assetId, meterUnit, assetActive }: { assetId: string; met
                       </Link>
                     ) : (
                       task.active &&
-                      assetActive && (
+                      assetActive &&
+                      canWork && (
                         <form action={startPmNow.bind(null, task.id)}>
                           <button type="submit" className="link text-sm" title="Create the work order now, before it's due">
                             Start early
@@ -356,7 +399,19 @@ function DowntimeTab({ downtimes, now }: { downtimes: DowntimeRow[]; now: Date }
   );
 }
 
-async function MeterTab({ assetId, meterUnit, currentMeter, updatedAt }: { assetId: string; meterUnit: string; currentMeter: number | null; updatedAt: Date | null }) {
+async function MeterTab({
+  assetId,
+  meterUnit,
+  currentMeter,
+  updatedAt,
+  canWork,
+}: {
+  assetId: string;
+  meterUnit: string;
+  currentMeter: number | null;
+  updatedAt: Date | null;
+  canWork: boolean;
+}) {
   const readings = await db.meterReading.findMany({ where: { assetId }, orderBy: { recordedAt: "desc" }, take: 100, include: { recordedBy: true } });
   return (
     <div className="grid gap-6 lg:grid-cols-3">
@@ -367,7 +422,7 @@ async function MeterTab({ assetId, meterUnit, currentMeter, updatedAt }: { asset
           </div>
           <div className="text-xs text-slate-500">Updated {formatDate(updatedAt)}</div>
         </div>
-        <MeterForm action={recordMeter.bind(null, assetId)} meterUnit={meterUnit} />
+        {canWork && <MeterForm action={recordMeter.bind(null, assetId)} meterUnit={meterUnit} />}
       </Card>
       <div className="lg:col-span-2">
         <Card title="Reading history">
@@ -398,5 +453,20 @@ async function MeterTab({ assetId, meterUnit, currentMeter, updatedAt }: { asset
         </Card>
       </div>
     </div>
+  );
+}
+
+async function FilesTab({ assetId, meId, canWork, canManage }: { assetId: string; meId: string; canWork: boolean; canManage: boolean }) {
+  const attachments = await db.attachment.findMany({ where: { assetId }, orderBy: { createdAt: "desc" }, include: { uploadedBy: true } });
+  return (
+    <Card title="Photos & documents">
+      <p className="mb-4 text-sm text-slate-600">Manuals, wiring diagrams, nameplate photos — anything you want at hand for this equipment.</p>
+      <Attachments
+        attachments={attachments}
+        target={{ assetId }}
+        canUpload={canWork}
+        canDelete={(a) => canWork && (a.uploadedById === meId || canManage)}
+      />
+    </Card>
   );
 }

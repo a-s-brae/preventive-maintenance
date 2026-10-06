@@ -1,3 +1,4 @@
+import { requirePermission } from "@/auth";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { deleteTask, saveTask } from "@/lib/actions";
@@ -7,6 +8,7 @@ import { ConfirmButton } from "@/components/form";
 import { Card, PageHeader } from "@/components/ui";
 
 export default async function EditTaskPage({ params }: { params: Promise<{ id: string }> }) {
+  await requirePermission("manage");
   const { id } = await params;
   const [task, users] = await Promise.all([db.pmTask.findUnique({ where: { id }, include: { asset: true } }), getUsers()]);
   if (!task) notFound();

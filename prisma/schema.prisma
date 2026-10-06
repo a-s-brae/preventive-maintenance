@@ -99,11 +99,12 @@ model Asset {
   createdAt      DateTime    @default(now())
   updatedAt      DateTime    @updatedAt
 
-  tasks      PmTask[]
-  workOrders WorkOrder[]
-  readings   MeterReading[]
-  downtimes  Downtime[]
-  requests   Request[]
+  tasks       PmTask[]
+  workOrders  WorkOrder[]
+  readings    MeterReading[]
+  downtimes   Downtime[]
+  requests    Request[]
+  attachments Attachment[]
 
   @@index([status])
   @@index([locationId])
@@ -241,8 +242,11 @@ model WorkOrder {
   createdAt        DateTime        @default(now())
   updatedAt        DateTime        @updatedAt
 
-  request   Request?
-  downtimes Downtime[]
+  request     Request?
+  downtimes   Downtime[]
+  partUsages  PartUsage[]
+  labor       LaborEntry[]
+  attachments Attachment[]
 
   @@index([status, dueDate])
   @@index([assetId, completedAt])
@@ -262,7 +266,128 @@ model MeterReading {
   @@index([assetId, recordedAt])
 }
 
+// ─── Parts, labor, files ─────────────────────────────────────────────────────
+
+enum StockReason {
+  RESTOCK // received stock
+  USED // used on a work order
+  RETURNED // taken back off a work order
+  ADJUST // corrected after a count
+}
+
+/// A spare part or consumable kept in stock.
+model Part {
+  id              String   @id @default(cuid())
+  name            String
+  partNumber      String?  @unique
+  description     String?
+  /// Counting unit: ea, ft, qt, box…
+  unit            String   @default("ea")
+  quantity        Float    @default(0)
+  /// At or below this, the part shows as low stock.
+  minQuantity     Float?
+  unitCost        Float?
+  /// Where it's kept, e.g. "Crib A, bin 12".
+  storageLocation String?
+  vendor          String?
+  notes           String?
+  /// Inactive parts are hidden from pickers but keep their history.
+  active          Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  usages       PartUsage[]
+  transactions StockTransaction[]
+
+  @@index([active, name])
+}
+
+/// Parts used on a work order. Using parts takes them out of stock.
+model PartUsage {
+  id          String    @id @default(cuid())
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  partId      String
+  part        Part      @relation(fields: [partId], references: [id], onDelete: Restrict)
+  quantity    Float
+  /// Unit cost when it was used (prices change).
+  unitCost    Float?
+  usedById    String?
+  usedBy      User?     @relation(fields: [usedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime  @default(now())
+
+  @@index([workOrderId])
+  @@index([partId])
+}
+
+/// Every change to a part's stock, for the history.
+model StockTransaction {
+  id            String      @id @default(cuid())
+  partId        String
+  part          Part        @relation(fields: [partId], references: [id], onDelete: Cascade)
+  change        Float
+  quantityAfter Float
+  reason        StockReason
+  unitCost      Float?
+  workOrderId   String?
+  note          String?
+  userId        String?
+  user          User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  createdAt     DateTime    @default(now())
+
+  @@index([partId, createdAt])
+}
+
+/// Time someone spent on a work order. A running timer has no endedAt.
+model LaborEntry {
+  id          String    @id @default(cuid())
+  workOrderId String
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  startedAt   DateTime
+  endedAt     DateTime?
+  minutes     Int?
+  note        String?
+  /// "<userId>:<workOrderId>" while the timer runs: one running timer per person per work order.
+  runningKey  String?   @unique
+  createdAt   DateTime  @default(now())
+
+  @@index([workOrderId])
+}
+
+/// A photo or document on a work order or an asset. The bytes live in AttachmentData.
+model Attachment {
+  id           String          @id @default(cuid())
+  workOrderId  String?
+  workOrder    WorkOrder?      @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  assetId      String?
+  asset        Asset?          @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  fileName     String
+  mimeType     String
+  size         Int
+  uploadedById String?
+  uploadedBy   User?           @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime        @default(now())
+  data         AttachmentData?
+
+  @@index([workOrderId])
+  @@index([assetId])
+}
+
+model AttachmentData {
+  attachmentId String     @id
+  attachment   Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  bytes        Bytes
+}
+
 // ─── Auth.js (magic-link sign-in) ────────────────────────────────────────────
+
+enum Role {
+  ADMIN // supervisors: approve requests, manage PM schedules, assets, parts and people
+  TECH // maintenance: do and record the work
+  REQUESTER // everyone else: report problems, follow their requests
+}
 
 model User {
   id            String    @id @default(cuid())
@@ -270,6 +395,11 @@ model User {
   email         String    @unique
   emailVerified DateTime?
   image         String?
+  role          Role      @default(REQUESTER)
+  /// Deactivated users can't sign in.
+  active        Boolean   @default(true)
+  /// Gets the daily overdue / due-today email.
+  emailDigest   Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -277,14 +407,18 @@ model User {
   sessions Session[]
   readings MeterReading[]
 
-  assignedWorkOrders  WorkOrder[] @relation("WorkOrderAssignee")
-  createdWorkOrders   WorkOrder[] @relation("WorkOrderCreator")
-  completedWorkOrders WorkOrder[] @relation("WorkOrderCompleter")
-  defaultForPmTasks   PmTask[]    @relation("PmDefaultAssignee")
-  requests            Request[]   @relation("RequestRequester")
-  reviewedRequests    Request[]   @relation("RequestReviewer")
-  startedDowntimes    Downtime[]  @relation("DowntimeStarter")
-  endedDowntimes      Downtime[]  @relation("DowntimeEnder")
+  assignedWorkOrders  WorkOrder[]        @relation("WorkOrderAssignee")
+  createdWorkOrders   WorkOrder[]        @relation("WorkOrderCreator")
+  completedWorkOrders WorkOrder[]        @relation("WorkOrderCompleter")
+  defaultForPmTasks   PmTask[]           @relation("PmDefaultAssignee")
+  requests            Request[]          @relation("RequestRequester")
+  reviewedRequests    Request[]          @relation("RequestReviewer")
+  startedDowntimes    Downtime[]         @relation("DowntimeStarter")
+  endedDowntimes      Downtime[]         @relation("DowntimeEnder")
+  partUsages          PartUsage[]
+  stockTransactions   StockTransaction[]
+  labor               LaborEntry[]
+  attachments         Attachment[]
 }
 
 model Account {

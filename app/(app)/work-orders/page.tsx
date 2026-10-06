@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { requireUser } from "@/auth";
+import { requirePermission } from "@/auth";
 import { DUE_FILTERS, filtersHref, loadCompletedWorkOrders, loadOpenWorkOrders, parseFilters, PRIORITY_FILTERS, STATUS_FILTERS, VIEWS, type WorkOrderFilters } from "@/lib/work-order-filters";
 import { PRIORITY_LABEL, STATUS_LABEL } from "@/lib/work-orders";
 import { CompletedWorkOrderTable, OpenWorkOrderList } from "@/components/work-order-table";
@@ -11,7 +11,7 @@ const DUE_LABEL = { overdue: "Overdue", soon: "Due this week" } as const;
 const BASE = "/work-orders";
 
 export default async function WorkOrdersPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
-  const user = await requireUser();
+  const user = await requirePermission("view");
   const f = parseFilters(await searchParams);
   const open = f.view !== "complete";
   const rows = open ? await loadOpenWorkOrders(f, user.id) : await loadCompletedWorkOrders(f, 200);

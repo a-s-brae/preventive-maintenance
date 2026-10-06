@@ -1,6 +1,8 @@
+import { requirePermission } from "@/auth";
 import Link from "next/link";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { can } from "@/lib/permissions";
 import { formatNumber } from "@/lib/forms";
 import { getLocationTree } from "@/lib/queries";
 import { compareDue, computeDue } from "@/lib/schedule";
@@ -11,6 +13,7 @@ import { ButtonLink, Card, DownBadge, Empty, PageHeader, StatusBadge } from "@/c
 export const dynamic = "force-dynamic";
 
 export default async function AssetsPage({ searchParams }: { searchParams: Promise<{ q?: string; all?: string; location?: string; down?: string }> }) {
+  const me = await requirePermission("view");
   const { q: rawQ, all, location, down } = await searchParams;
   const q = rawQ?.trim();
   const locations = await getLocationTree();
@@ -53,7 +56,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
         <a href="/assets/export" className="btn-secondary" download>
           Export CSV
         </a>
-        <ButtonLink href={`/assets/new${location ? `?locationId=${location}` : ""}`}>+ Asset</ButtonLink>
+        {can(me.role, "manage") && <ButtonLink href={`/assets/new${location ? `?locationId=${location}` : ""}`}>+ Asset</ButtonLink>}
       </PageHeader>
       <form className="mb-3 flex flex-wrap items-center gap-2">
         <input name="q" defaultValue={q} placeholder="Search name, tag, model…" className="input w-64" />

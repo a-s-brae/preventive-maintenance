@@ -56,7 +56,17 @@ export function FormError({ error }: { error?: string }) {
 }
 
 /** A button that asks for confirmation before running a server action. */
-export function ConfirmButton({ action, message, children }: { action: () => Promise<void>; message: string; children: React.ReactNode }) {
+export function ConfirmButton({
+  action,
+  message,
+  children,
+  className = "btn-danger",
+}: {
+  action: () => Promise<void>;
+  message: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
     <form
       action={action}
@@ -64,7 +74,7 @@ export function ConfirmButton({ action, message, children }: { action: () => Pro
         if (!confirm(message)) e.preventDefault();
       }}
     >
-      <button type="submit" className="btn-danger">
+      <button type="submit" className={className}>
         {children}
       </button>
     </form>

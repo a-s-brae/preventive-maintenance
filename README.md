@@ -27,6 +27,12 @@ computer (`npm run local`) or hosted on Vercel.
 | **Asset page** | Tabs: Overview (details, meter, sub-assets, open work) · Work orders · PM schedules · Downtime · Meter readings. |
 | **Downtime** | Mark an asset down / back up, tick "asset is down" on a new repair or request, and mark it back up when completing the work order. Totals for 7 / 30 / 90 days and a downtime log. Down assets show on the dashboard. |
 | **Requests** | Anyone can **Report a problem** (what's wrong, which equipment, how urgent, is it down). A reviewer approves it into a work order or rejects it with a reason. |
+| **Roles** | **Admin** (set-up, reviewing requests, people), **Technician** (does and records the work), **Requester** (reports problems, follows their own requests). The first person to sign in becomes admin; new people start as requesters. Manage roles on the **People** page. |
+| **Parts & stock** | Parts list with on-hand quantity, low-stock level, cost and bin location. Restock and count corrections, a full stock history, low-stock badges and a dashboard card. Parts used on a work order come out of stock (and go back if removed). |
+| **Labor time** | Start / stop timer on a work order (several people can be on the clock), or log time afterwards. Totals on the work order and in reports. |
+| **Photos & files** | Attach photos and PDFs to work orders and assets (manuals, nameplates). Phone photos are shrunk before uploading. |
+| **Printable records** | A printable work order record (checklist, parts, time, photos, sign-off lines) and an asset's maintenance history for any date range — print or save as PDF for audits. |
+| **Daily email** | Each weekday morning, techs and admins get their overdue / due-soon work orders, and admins a plant summary. Needs email set up (hosted only); preview it on the People page. |
 | **Sign-in** | Email magic link, restricted to `ALLOWED_EMAIL_DOMAINS` (default `as-plastech.com`). In local mode, sign-in skips the email step. |
 
 The due-date rules ([`lib/schedule.ts`](lib/schedule.ts)), work order due status
@@ -48,6 +54,8 @@ account, email service or cloud setup.
    opens **http://localhost:3000** when it's ready.
 5. Sign in with your company email. In local mode there's no email check, so
    you're signed in right away.
+   The first person to sign in becomes the **admin**; everyone after starts as a
+   **requester** until an admin makes them a technician on the **People** page.
 6. On the empty dashboard, click **Load sample equipment** to try it out, or
    **Add asset** to start entering real equipment.
 
@@ -91,6 +99,9 @@ stay on and awake for others to use it.
    | `AUTH_RESEND_KEY` | your Resend API key |
    | `EMAIL_FROM` | e.g. `PM System <pm@as-plastech.com>` (must be on the verified domain) |
    | `ALLOWED_EMAIL_DOMAINS` | `as-plastech.com` (comma-separate to allow more) |
+   | `CRON_SECRET` | any long random string — protects the daily email job (Vercel sends it automatically) |
+   | `APP_URL` | the site's address, e.g. `https://pm.as-plastech.com` (used for links in emails) |
+   | `ORG_NAME` | optional — company name on printed records (default "A.S. Plastech") |
 
 5. **Deploy.** The `vercel-build` script runs `prisma migrate deploy`, so the tables
    are created on the first deploy.
@@ -145,7 +156,6 @@ is copied; Atlas is AGPL).
 
 1. ~~Work orders as the core, fixed schedules, typed checklists, calendar~~ ✅
 2. ~~Plant structure: locations tree, parent/child assets, downtime logging, requests~~ ✅
-3. Parts used on work orders with min-stock alerts, labor time, photos, roles
-   (admin / tech / requester), email for overdue work.
+3. ~~Parts & stock, labor time, photos & files, roles, daily email, printable records~~ ✅
 4. Reports (PM compliance, MTBF / MTTR, cost per asset), QR labels on equipment,
    meter threshold alerts.

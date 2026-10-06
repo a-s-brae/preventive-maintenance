@@ -1,10 +1,12 @@
-import { auth } from "@/auth";
+import { auth, type SessionUser } from "@/auth";
+import { can } from "@/lib/permissions";
 import { csvDate, csvResponse, toCsv } from "@/lib/csv";
 import { db } from "@/lib/db";
 
 export async function GET() {
   const session = await auth();
   if (!session?.user?.id) return new Response("Sign in first", { status: 401 });
+  if (!can((session.user as SessionUser).role, "view")) return new Response("Not allowed", { status: 403 });
   const assets = await db.asset.findMany({
     orderBy: { name: "asc" },
     include: { location: true, parent: true, downtimes: { where: { endedAt: null }, take: 1 }, _count: { select: { tasks: { where: { active: true } }, workOrders: { where: { status: { not: "COMPLETE" } } } } } },

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { RequestStatus } from "@prisma/client";
+import { requirePermission } from "@/auth";
 import { db } from "@/lib/db";
+import { can } from "@/lib/permissions";
 import { formatDateTime, requestNumber } from "@/lib/downtime";
 import { userLabel } from "@/lib/queries";
 import { PRIORITY_LABEL, woNumber } from "@/lib/work-orders";
@@ -17,22 +19,25 @@ const VIEWS = [
 
 
 export default async function RequestsPage({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
+  const user = await requirePermission("report");
+  // Requesters only see the problems they reported.
+  const mine = can(user.role, "view") ? {} : { requestedById: user.id };
   const { view: rawView } = await searchParams;
-  const view = VIEWS.find((v) => v.key === rawView) ?? VIEWS[0];
+  const view = VIEWS.find((v) => v.key === rawView) ?? (can(user.role, "view") ? VIEWS[0] : VIEWS[3]);
   const [requests, counts] = await Promise.all([
     db.request.findMany({
-      where: view.status ? { status: view.status } : {},
+      where: { ...mine, ...(view.status ? { status: view.status } : {}) },
       orderBy: { createdAt: view.status === "PENDING" ? "asc" : "desc" },
       take: 200,
       include: { asset: true, location: true, requestedBy: true, workOrder: true },
     }),
-    db.request.groupBy({ by: ["status"], _count: true }),
+    db.request.groupBy({ by: ["status"], where: mine, _count: true }),
   ]);
   const countOf = (s: RequestStatus | null) => (s ? (counts.find((c) => c.status === s)?._count ?? 0) : counts.reduce((n, c) => n + c._count, 0));
 
   return (
     <>
-      <PageHeader title="Requests">
+      <PageHeader title={can(user.role, "view") ? "Requests" : "My requests"}>
         <ButtonLink href="/requests/new">Report a problem</ButtonLink>
       </PageHeader>
       <nav className="mb-4 flex w-fit flex-wrap gap-1 rounded-lg bg-slate-200/60 p-1 text-sm">

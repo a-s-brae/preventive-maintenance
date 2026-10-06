@@ -2,6 +2,7 @@ import { cache } from "react";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { compareDue, computeDue } from "@/lib/schedule";
+import { stockStatus } from "@/lib/parts";
 import { flattenTree } from "@/lib/tree";
 import { OPEN_STATUSES, syncPmWorkOrders, workOrderDue } from "@/lib/work-orders";
 
@@ -48,12 +49,18 @@ export async function getOpenWorkOrders(where: Prisma.WorkOrderWhereInput = {}):
 export const getAllOpenWorkOrders = cache(() => getOpenWorkOrders());
 
 /** Counts for the sidebar badges. */
-export async function getNavCounts(userId: string) {
-  const [open, pendingRequests] = await Promise.all([getAllOpenWorkOrders(), db.request.count({ where: { status: "PENDING" } })]);
+export async function getNavCounts(userId: string, staff: boolean) {
+  if (!staff) return { overdue: 0, mine: 0, pendingRequests: 0, lowStock: 0 };
+  const [open, pendingRequests, parts] = await Promise.all([
+    getAllOpenWorkOrders(),
+    db.request.count({ where: { status: "PENDING" } }),
+    db.part.findMany({ where: { active: true }, select: { quantity: true, minQuantity: true } }),
+  ]);
   return {
     overdue: open.filter((wo) => wo.due.status === "OVERDUE").length,
     mine: open.filter((wo) => wo.assignedToId === userId).length,
     pendingRequests,
+    lowStock: parts.filter((p) => stockStatus(p) !== "OK").length,
   };
 }
 

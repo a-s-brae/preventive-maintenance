@@ -1,5 +1,7 @@
+import { requirePermission } from "@/auth";
 import Link from "next/link";
 import { db } from "@/lib/db";
+import { can } from "@/lib/permissions";
 import { getLocationTree } from "@/lib/queries";
 import { descendantIds } from "@/lib/tree";
 import { ButtonLink, Card, Empty, PageHeader } from "@/components/ui";
@@ -7,6 +9,7 @@ import { ButtonLink, Card, Empty, PageHeader } from "@/components/ui";
 export const dynamic = "force-dynamic";
 
 export default async function LocationsPage() {
+  const me = await requirePermission("view");
   const [locations, assets, unplaced] = await Promise.all([
     getLocationTree(),
     db.asset.findMany({ where: { status: { not: "RETIRED" } }, select: { locationId: true, downtimes: { where: { endedAt: null }, select: { id: true }, take: 1 } } }),
@@ -22,7 +25,7 @@ export default async function LocationsPage() {
   return (
     <>
       <PageHeader title="Locations">
-        <ButtonLink href="/locations/new">+ Location</ButtonLink>
+        {can(me.role, "manage") && <ButtonLink href="/locations/new">+ Location</ButtonLink>}
       </PageHeader>
       <p className="-mt-3 mb-6 text-sm text-slate-600">
         Organize equipment by where it is, e.g. <em>Main plant › Molding › Line 3</em>. Counts include everything inside a location.
@@ -65,9 +68,11 @@ export default async function LocationsPage() {
                       </td>
                       <td>{t.down ? <span className="font-medium text-red-700">{t.down} down</span> : <span className="text-slate-400">—</span>}</td>
                       <td className="text-right">
-                        <Link href={`/locations/new?parentId=${l.id}`} className="link text-xs whitespace-nowrap">
-                          + Inside
-                        </Link>
+                        {can(me.role, "manage") && (
+                          <Link href={`/locations/new?parentId=${l.id}`} className="link text-xs whitespace-nowrap">
+                            + Inside
+                          </Link>
+                        )}
                       </td>
                     </tr>
                   );

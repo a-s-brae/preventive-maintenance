@@ -95,8 +95,10 @@ stay on and awake for others to use it.
 1. **Import the repo:** Vercel → *Add New… → Project* → pick this repo. The framework
    is detected as Next.js; leave the defaults.
 2. **Add the database:** in the project, go to *Storage → Create Database → Neon*
-   (Marketplace) and connect it to the project. This sets `DATABASE_URL` and
-   `DATABASE_URL_UNPOOLED` automatically.
+   (Marketplace) and connect it to the project, ticking **Production** and
+   **Preview**. This sets `DATABASE_URL` and `DATABASE_URL_UNPOOLED` automatically.
+   Prisma Postgres (also under *Storage*) works too: the build finds whichever
+   connection variables your database sets.
 3. **Set up email (Resend):**
    - Create an account at [resend.com](https://resend.com), add and verify the
      `as-plastech.com` domain (DNS records), and create an API key.
@@ -114,8 +116,12 @@ stay on and awake for others to use it.
    | `ORG_NAME` | optional — company name on printed records and labels (default "A.S. Plastech") |
    | `LABOR_RATE` | optional — default labor cost per hour for reports (can be changed on the page) |
 
-5. **Deploy.** The `vercel-build` script runs `prisma migrate deploy`, so the tables
-   are created on the first deploy.
+5. **Deploy.** The `vercel-build` script ([`scripts/vercel-build.ts`](scripts/vercel-build.ts))
+   checks these settings first, then runs `prisma migrate deploy` (so the tables are
+   created on the first deploy) and builds the app. If a required setting is
+   missing, the build log lists what to add, under *PM System — checking settings*.
+   After changing environment variables, redeploy (*Deployments → ⋯ → Redeploy*):
+   Vercel only reads them when it builds.
 6. Open the site, sign in with your company email, and add your first asset.
 
 On an empty database the dashboard offers **Load sample equipment** (compressor,

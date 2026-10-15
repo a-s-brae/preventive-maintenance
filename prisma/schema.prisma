@@ -5,7 +5,8 @@ generator client {
 datasource db {
   provider  = "postgresql"
   // Neon: DATABASE_URL is the pooled connection, DATABASE_URL_UNPOOLED is direct
-  // (used by migrations). The Vercel ↔ Neon integration sets both.
+  // (used by migrations). The Vercel ↔ Neon integration sets both; with other
+  // databases the Vercel build fills them in (lib/db-env.ts, scripts/vercel-build.ts).
   url       = env("DATABASE_URL")
   directUrl = env("DATABASE_URL_UNPOOLED")
 }

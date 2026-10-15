@@ -1,4 +1,4 @@
-import { auth, type SessionUser } from "@/auth";
+import { currentUser } from "@/auth";
 import { can } from "@/lib/permissions";
 import { csvDate, csvResponse, toCsv } from "@/lib/csv";
 import { parseResults, summarize } from "@/lib/checklist";
@@ -8,11 +8,11 @@ import { PRIORITY_LABEL, STATUS_LABEL, TYPE_LABEL, woNumber } from "@/lib/work-o
 
 /** The work order list as CSV, with the same filters as the page. */
 export async function GET(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) return new Response("Sign in first", { status: 401 });
-  if (!can((session.user as SessionUser).role, "view")) return new Response("Not allowed", { status: 403 });
+  const user = await currentUser();
+  if (!user || user.active === false) return new Response("Sign in first", { status: 401 });
+  if (!can(user.role, "view")) return new Response("Not allowed", { status: 403 });
   const f = parseFilters(Object.fromEntries(new URL(req.url).searchParams));
-  const rows = f.view === "complete" ? await loadCompletedWorkOrders(f) : await loadOpenWorkOrders(f, session.user.id);
+  const rows = f.view === "complete" ? await loadCompletedWorkOrders(f) : await loadOpenWorkOrders(f, user.id);
 
   const csv = toCsv(
     ["Number", "Title", "Type", "Status", "Priority", "Asset", "Asset tag", "Location", "Assigned to", "Due date", "Due meter", "Created", "Completed", "Completed by", "Meter reading", "Checklist done", "Checklist problems", "Notes"],

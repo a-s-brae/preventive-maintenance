@@ -1,16 +1,16 @@
-import { auth, type SessionUser } from "@/auth";
+import { currentUser } from "@/auth";
 import { db } from "@/lib/db";
 import { ALLOWED_TYPES, MAX_BYTES } from "@/lib/files";
 import { can } from "@/lib/permissions";
 
 /** Upload a photo or PDF to a work order or an asset. */
 export async function POST(req: Request) {
-  const session = await auth();
-  const user = session?.user as SessionUser | undefined;
-  if (!user?.id) return Response.json({ error: "Sign in first" }, { status: 401 });
+  const user = await currentUser();
+  if (!user || user.active === false) return Response.json({ error: "Sign in first" }, { status: 401 });
   if (!can(user.role, "work")) return Response.json({ error: "Not allowed" }, { status: 403 });
 
-  const form = await req.formData();
+  const form = await req.formData().catch(() => null);
+  if (!form) return Response.json({ error: "Send the file as a form upload" }, { status: 400 });
   const file = form.get("file");
   const workOrderId = String(form.get("workOrderId") ?? "") || null;
   const assetId = String(form.get("assetId") ?? "") || null;

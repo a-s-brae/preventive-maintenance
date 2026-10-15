@@ -63,7 +63,8 @@ export function AppShell({
   email: string;
   role: Role;
   counts: Counts;
-  signOutAction: () => Promise<void>;
+  /** Absent with team password sign-in, where the browser holds the sign-in. */
+  signOutAction?: () => Promise<void>;
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -101,9 +102,13 @@ export function AppShell({
         <div className="truncate text-slate-400" title={email}>
           {email}
         </div>
-        <button type="submit" className="mt-1 text-slate-200 hover:text-white hover:underline">
-          Sign out
-        </button>
+        {signOutAction ? (
+          <button type="submit" className="mt-1 text-slate-200 hover:text-white hover:underline">
+            Sign out
+          </button>
+        ) : (
+          <div className="mt-1 text-xs text-slate-500">Signed in with the team password</div>
+        )}
       </form>
     </div>
   );

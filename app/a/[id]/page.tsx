@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { auth, requireUser } from "@/auth";
+import { currentUser, requireUser } from "@/auth";
 import { can } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +8,7 @@ export const dynamic = "force-dynamic";
  *  on "Report a problem" with the asset filled in. */
 export default async function ScanPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  if (!(await auth())?.user) redirect(`/login?next=${encodeURIComponent(`/a/${id}`)}`);
+  if (!(await currentUser())) redirect(`/login?next=${encodeURIComponent(`/a/${id}`)}`);
   const user = await requireUser();
   redirect(can(user.role, "view") ? `/assets/${encodeURIComponent(id)}` : `/requests/new?assetId=${encodeURIComponent(id)}`);
 }

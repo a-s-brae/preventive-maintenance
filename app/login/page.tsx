@@ -1,14 +1,17 @@
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
-import { auth, isAllowedEmail, localLogin, signIn, takeLocalLink } from "@/auth";
+import { currentUser, isAllowedEmail, localLogin, signIn, takeLocalLink } from "@/auth";
 import { LoginForm, type LoginState } from "@/components/login-form";
 import { db } from "@/lib/db";
+import { teamPassword } from "@/lib/team-password";
 
 const ERRORS: Record<string, string> = {
   AccessDenied: "That email address isn't allowed. Use your company email.",
   Verification: "That sign-in link has expired or was already used. Request a new one.",
   Configuration: "Sign-in isn't set up correctly. Ask your administrator to check the email settings.",
   EmailSignInError: "We couldn't send the sign-in email. Try again, or contact your administrator.",
+  Deactivated: "Your account has been deactivated. Ask an admin if you need access again.",
+  TeamPassword: "Sign in with your work email as the username and the team password.",
 };
 const GENERIC_ERROR = "Sign-in failed. Please try again.";
 
@@ -18,7 +21,21 @@ const safeNext = (v: unknown) => (typeof v === "string" && /^\/(?![/\\])/.test(v
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; next?: string }> }) {
   const { error, next: nextParam } = await searchParams;
   const next = safeNext(nextParam);
-  if ((await auth())?.user) redirect(next);
+  // Team password sign-in happens in the browser's own sign-in box (proxy.ts):
+  // there's no form here, only the reason someone was turned away.
+  if (teamPassword()) {
+    if (!error) redirect(next);
+    return (
+      <main className="flex min-h-screen items-center justify-center px-4">
+        <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+          <h1 className="text-xl font-semibold">PM System</h1>
+          <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">{ERRORS[error] ?? GENERIC_ERROR}</p>
+          <p className="mt-3 text-sm text-slate-600">To sign in with a different email, close all browser windows and open the site again.</p>
+        </div>
+      </main>
+    );
+  }
+  if (await currentUser()) redirect(next);
 
   async function requestSignIn(_prev: LoginState, fd: FormData): Promise<LoginState> {
     "use server";

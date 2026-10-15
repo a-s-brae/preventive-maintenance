@@ -1,12 +1,11 @@
-import { auth, type SessionUser } from "@/auth";
+import { currentUser } from "@/auth";
 import { db } from "@/lib/db";
 import { can } from "@/lib/permissions";
 
 /** Serve an attachment to signed-in staff. */
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const session = await auth();
-  const user = session?.user as SessionUser | undefined;
-  if (!user?.id) return new Response("Sign in first", { status: 401 });
+  const user = await currentUser();
+  if (!user || user.active === false) return new Response("Sign in first", { status: 401 });
   if (!can(user.role, "view")) return new Response("Not allowed", { status: 403 });
 
   const { id } = await params;

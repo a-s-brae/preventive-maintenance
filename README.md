@@ -39,7 +39,7 @@ computer (`npm run local`) or hosted on Vercel.
 | **Reports** | Pick a date range (30 / 90 days, 12 months, this year, or custom). KPIs: **PM compliance** (done by the due date), work orders done / open / overdue, **downtime**, **MTTR / MTBF**, and **maintenance cost** (parts, plus labor at an hourly rate you enter). Charts of work done by type, compliance over time, downtime and cost by asset, and a per-asset table with CSV export. |
 | **QR labels** | Print 2″ × 4″ labels (Avery 5163) for one asset, a location or all equipment. Scanning opens the asset for staff, and **Report a problem** with the asset filled in for everyone else (after sign-in if needed). |
 | **Daily email** | Each weekday morning, techs and admins get their overdue / due-soon work orders, and admins a plant summary. Needs email set up (hosted only); preview it on the People page. |
-| **Sign-in** | Email magic link, restricted to `ALLOWED_EMAIL_DOMAINS` (default `as-plastech.com`). In local mode, sign-in skips the email step. |
+| **Sign-in** | Email magic link, restricted to `ALLOWED_EMAIL_DOMAINS` (default `as-plastech.com`). In local mode, sign-in skips the email step. Until email works, a shared **team password** can be used instead (below). |
 
 The due-date rules ([`lib/schedule.ts`](lib/schedule.ts)), work order due status
 ([`lib/work-orders.ts`](lib/work-orders.ts)) and checklist handling
@@ -124,6 +124,20 @@ stay on and awake for others to use it.
    Vercel only reads them when it builds.
 6. Open the site, sign in with your company email, and add your first asset.
 
+### Team password instead of email sign-in
+
+While sign-in email isn't working (for example, before your domain is verified in
+Resend), set `TEAM_PASSWORD` in Vercel and redeploy. There's then no sign-in page or
+email: the browser asks for a **username** (your work email) and **password** (the
+team password), and remembers them. Everyone still has their own account — the first
+person in becomes the admin, others start as requesters — so roles and "assigned to
+me" keep working.
+
+- Use at least 12 characters, e.g. a few words: `belts-and-bearings-friday`.
+- Anyone with the password can sign in as any company address, so keep it to the team.
+- There's no "Sign out": to switch person, close all browser windows (or use a private window).
+- To go back to email sign-in, delete `TEAM_PASSWORD` and redeploy.
+
 On an empty database the dashboard offers **Load sample equipment** (compressor,
 forklift, HVAC, extinguishers) so you can try it out before entering real assets.
 
@@ -160,7 +174,8 @@ app/
     assets/import, parts/import   CSV import with preview
   a/[id]                  where QR labels point (asset for staff, report a problem for others)
   print/                  printable work orders, asset history, QR labels
-auth.ts                   Auth.js config + domain allow-list + requireUser()
+auth.ts                   Auth.js config + requireUser() / currentUser() (email link or team password)
+proxy.ts                  asks for the team password on every page while TEAM_PASSWORD is set
 lib/schedule.ts           PM due-date rules (pure, tested)
 lib/work-orders.ts        PM → work order generation, work order due status
 lib/checklist.ts          typed checklist items, reading limits, answers (pure, tested)

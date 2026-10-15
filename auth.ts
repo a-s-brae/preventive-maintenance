@@ -1,20 +1,16 @@
 import NextAuth from "next-auth";
 import Resend from "next-auth/providers/resend";
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { cache } from "react";
 import type { Role } from "@prisma/client";
 import { db } from "@/lib/db";
+import { isAllowedEmail } from "@/lib/email-domains";
 import { can, type Permission } from "@/lib/permissions";
+import { parseBasicAuth, passwordMatches, teamPassword } from "@/lib/team-password";
 
-const allowedDomains = (process.env.ALLOWED_EMAIL_DOMAINS ?? "as-plastech.com")
-  .split(",")
-  .map((s) => s.trim().toLowerCase())
-  .filter(Boolean);
-
-export function isAllowedEmail(email: string | null | undefined): boolean {
-  const domain = email?.toLowerCase().split("@")[1];
-  return !!domain && allowedDomains.includes(domain);
-}
+export { isAllowedEmail };
 
 /** Local mode, for running on your own computer: sign-in skips the email step,
  *  so anyone who can open the app can sign in with any allowed address. It is
@@ -61,15 +57,44 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 });
 
 export type SessionUser = { id: string; email: string; name?: string | null; role: Role };
+type CurrentUser = SessionUser & { active?: boolean };
+
+/** Team password sign-in (lib/team-password.ts): the person is the work email
+ *  given with the team password. Their account is made the first time they
+ *  sign in; the very first person becomes the admin, as with email sign-in. */
+const teamPasswordUser = cache(async (): Promise<CurrentUser | null> => {
+  const password = teamPassword();
+  const login = parseBasicAuth((await headers()).get("authorization"));
+  if (!password || !login || !passwordMatches(login.password, password) || !isAllowedEmail(login.email)) return null;
+  const select = { id: true, email: true, name: true, role: true, active: true } as const;
+  const existing = await db.user.findUnique({ where: { email: login.email }, select });
+  if (existing) return existing;
+  try {
+    const first = (await db.user.count()) === 0;
+    return await db.user.create({ data: { email: login.email, role: first ? "ADMIN" : "REQUESTER" }, select });
+  } catch (e) {
+    // Another request from the same browser made it first.
+    const created = await db.user.findUnique({ where: { email: login.email }, select });
+    if (created) return created;
+    throw e;
+  }
+});
+
+/** The signed-in person, or null. Route handlers use this; pages and actions use requireUser. */
+export async function currentUser(): Promise<CurrentUser | null> {
+  if (teamPassword()) return teamPasswordUser();
+  const user = (await auth())?.user as CurrentUser | undefined;
+  return user?.id ? user : null;
+}
 
 /** For server components and actions: the signed-in user, or redirect to /login. */
 export async function requireUser(): Promise<SessionUser> {
-  const session = await auth();
-  const user = session?.user as (SessionUser & { active?: boolean }) | undefined;
-  if (!user?.id) redirect("/login");
+  const user = await currentUser();
+  // With a team password the browser has already been asked (proxy.ts); /login explains.
+  if (!user) redirect(teamPassword() ? "/login?error=TeamPassword" : "/login");
   if (user.active === false) {
-    await signOut({ redirect: false });
-    redirect("/login?error=AccessDenied");
+    if (!teamPassword()) await signOut({ redirect: false });
+    redirect("/login?error=Deactivated");
   }
   return user;
 }

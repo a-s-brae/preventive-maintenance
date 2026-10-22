@@ -7,6 +7,7 @@ import { getLocationTree, getOpenWorkOrders } from "@/lib/queries";
 import { descendantIds, pathLabel } from "@/lib/tree";
 import { OpenWorkOrderList } from "@/components/work-order-table";
 import { ButtonLink, Card, DownBadge, Empty } from "@/components/ui";
+import { MoreMenu } from "@/components/more-menu";
 
 export const dynamic = "force-dynamic";
 
@@ -36,19 +37,19 @@ export default async function LocationPage({ params }: { params: Promise<{ id: s
           <h1 className="text-2xl font-semibold tracking-tight">{node.name}</h1>
           {location?.notes && <p className="mt-1 max-w-2xl text-sm whitespace-pre-wrap text-slate-600">{location.notes}</p>}
         </div>
-        <div className={`flex flex-wrap gap-2 ${can(me.role, "manage") ? "" : "hidden"}`}>
-          <a href={`/print/labels?location=${id}`} target="_blank" rel="noreferrer" className="btn-secondary">
-            QR labels
-          </a>
-          <ButtonLink href={`/locations/new?parentId=${id}`} variant="secondary">
-            + Location inside
-          </ButtonLink>
-          <ButtonLink href={`/assets/new?locationId=${id}`} variant="secondary">
-            + Asset here
-          </ButtonLink>
-          <ButtonLink href={`/locations/${id}/edit`} variant="secondary">
-            Edit
-          </ButtonLink>
+        <div className="flex flex-wrap items-center gap-2">
+          <MoreMenu
+            items={[
+              { label: "Print QR labels", href: `/print/labels?location=${id}`, newTab: true },
+              ...(can(me.role, "manage")
+                ? [
+                    { label: "Add a location inside", href: `/locations/new?parentId=${id}` },
+                    { label: "Edit location", href: `/locations/${id}/edit` },
+                  ]
+                : []),
+            ]}
+          />
+          {can(me.role, "manage") && <ButtonLink href={`/assets/new?locationId=${id}`}>+ Asset here</ButtonLink>}
         </div>
       </div>
 

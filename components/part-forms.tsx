@@ -1,7 +1,7 @@
 "use client";
 
 import type { Part } from "@prisma/client";
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import type { FormState } from "@/lib/forms";
 import { formatQty } from "@/lib/parts";
 import { ActionForm, Field, FormError, SubmitButton } from "./form";
@@ -25,8 +25,17 @@ function QuickForm({ action, children, className }: { action: Action; children: 
   );
 }
 
+/** Record parts used on a work order. Folded behind a link until needed. */
 export function UsePartForm({ action, parts }: { action: Action; parts: Pick<Part, "id" | "name" | "partNumber" | "quantity" | "unit">[] }) {
+  const [open, setOpen] = useState(false);
   if (parts.length === 0) return <p className="text-sm text-slate-500">No parts in the parts list yet.</p>;
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} className="text-sm font-medium text-sky-700 hover:underline">
+        + Add a part used
+      </button>
+    );
+  }
   return (
     <QuickForm action={action} className="flex flex-wrap items-end gap-2">
       <label className="min-w-0 flex-1">
@@ -48,6 +57,9 @@ export function UsePartForm({ action, parts }: { action: Action; parts: Pick<Par
         <input name="quantity" type="number" step="any" min="0" defaultValue="1" required className="input w-24" />
       </label>
       <SubmitButton className="btn-secondary">Add</SubmitButton>
+      <button type="button" onClick={() => setOpen(false)} className="btn-secondary">
+        Done
+      </button>
     </QuickForm>
   );
 }

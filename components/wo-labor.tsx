@@ -6,7 +6,6 @@ import { userLabel } from "@/lib/queries";
 import { ConfirmButton } from "./form";
 import { AddLaborForm } from "./labor-form";
 import { Timer } from "./timer";
-import { Empty } from "./ui";
 
 type Entry = LaborEntry & { user: User | null };
 
@@ -31,10 +30,16 @@ export function WorkOrderLabor({
   const others = entries.filter((e) => !e.endedAt && e.userId !== meId);
   const done = entries.filter((e) => e.endedAt).sort((a, b) => b.startedAt.getTime() - a.startedAt.getTime());
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm">
-          Total: <strong className="font-semibold tabular-nums">{formatMinutes(totalMinutes(entries, now))}</strong>
+          {entries.length === 0 ? (
+            <span className="text-slate-500">No time logged yet.</span>
+          ) : (
+            <>
+              Total: <strong className="font-semibold tabular-nums">{formatMinutes(totalMinutes(entries, now))}</strong>
+            </>
+          )}
           {others.length > 0 && (
             <span className="ml-2 text-slate-500">
               ({others.map((e) => userLabel(e.user)).join(", ")} {others.length === 1 ? "is" : "are"} on the clock)
@@ -60,9 +65,7 @@ export function WorkOrderLabor({
           )
         )}
       </div>
-      {done.length === 0 ? (
-        <Empty>No time logged yet.</Empty>
-      ) : (
+      {done.length > 0 && (
         <ul className="divide-y divide-slate-100 text-sm">
           {done.map((e) => (
             <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 py-2">

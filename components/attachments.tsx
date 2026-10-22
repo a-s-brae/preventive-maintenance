@@ -15,18 +15,21 @@ export function Attachments({
   target,
   canUpload,
   canDelete,
+  emptyText = "No photos or files yet.",
 }: {
   attachments: Row[];
   target: { workOrderId: string } | { assetId: string };
   canUpload: boolean;
   /** Whether this person may delete a given file. */
   canDelete: (a: Row) => boolean;
+  /** Shown when there are none; null shows nothing (the upload button says it all). */
+  emptyText?: string | null;
 }) {
   const photos = attachments.filter((a) => isImage(a.mimeType));
   const docs = attachments.filter((a) => !isImage(a.mimeType));
   return (
     <div className="space-y-4">
-      {attachments.length === 0 && <Empty>No photos or files yet.</Empty>}
+      {attachments.length === 0 && emptyText && <Empty>{emptyText}</Empty>}
       {photos.length > 0 && (
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {photos.map((a) => (

@@ -13,6 +13,7 @@ import { woNumber } from "@/lib/work-orders";
 import { can } from "@/lib/permissions";
 import { Attachments } from "@/components/attachments";
 import { DownForm } from "@/components/down-form";
+import { MoreMenu } from "@/components/more-menu";
 import { MeterForm } from "@/components/meter-form";
 import { CompletedWorkOrderTable, OpenWorkOrderList } from "@/components/work-order-table";
 import { ButtonLink, Card, DownBadge, DueText, Empty, StatusBadge } from "@/components/ui";
@@ -54,7 +55,6 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
   const location = locations.find((l) => l.id === asset.locationId);
   const openDowntime = asset.downtimes.find((d) => !d.endedAt);
   const now = new Date();
-  const last30 = downtimeHours(asset.downtimes, new Date(now.getTime() - 30 * DAY_MS), now, now);
 
   return (
     <>
@@ -83,63 +83,45 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
             {openDowntime ? <DownBadge since={`since ${formatDateTime(openDowntime.startedAt)}`} /> : <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">Running</span>}
             {asset.status !== "ACTIVE" && <span className="text-xs text-slate-500 uppercase">{asset.status.toLowerCase()}</span>}
           </div>
-          <div className="flex flex-wrap gap-2">
-            <ButtonLink href={`/requests/new?assetId=${asset.id}`} variant="secondary">
-              Report a problem
-            </ButtonLink>
-            {canWork && (
-              <ButtonLink href={`/work-orders/new?assetId=${asset.id}`} variant="secondary">
-                + Work order
-              </ButtonLink>
-            )}
-            <a href={`/print/assets/${asset.id}`} target="_blank" rel="noreferrer" className="btn-secondary">
-              Print history
-            </a>
-            <a href={`/print/labels?asset=${asset.id}`} target="_blank" rel="noreferrer" className="btn-secondary">
-              QR label
-            </a>
-            {canManage && (
-              <ButtonLink href={`/assets/${asset.id}/edit`} variant="secondary">
-                Edit
-              </ButtonLink>
-            )}
+          <div className="flex flex-wrap items-center gap-2">
+            {canWork && !openDowntime && <DownForm action={markAssetDown.bind(null, asset.id)} />}
+            <MoreMenu
+              items={[
+                { label: "Report a problem", href: `/requests/new?assetId=${asset.id}` },
+                { label: "Print maintenance history", href: `/print/assets/${asset.id}`, newTab: true },
+                { label: "Print QR label", href: `/print/labels?asset=${asset.id}`, newTab: true },
+                ...(canManage ? [{ label: "Edit details", href: `/assets/${asset.id}/edit` }] : []),
+              ]}
+            />
+            {canWork && <ButtonLink href={`/work-orders/new?assetId=${asset.id}`}>+ Work order</ButtonLink>}
           </div>
         </div>
       </div>
 
-      {/* Running / down control */}
-      <div className={`mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm ring-1 ${openDowntime ? "bg-red-50 ring-red-200" : "bg-white ring-slate-200"}`}>
-        {openDowntime ? (
-          <>
-            <div>
-              <strong className="text-red-800">Down for {formatDuration(downtimeHours([openDowntime], openDowntime.startedAt, now, now))}</strong>
-              {openDowntime.reason && <span className="text-red-800"> — {openDowntime.reason}</span>}
-              {openDowntime.workOrder && (
-                <>
-                  {" · "}
-                  <Link href={`/work-orders/${openDowntime.workOrder.id}`} className="link">
-                    {woNumber(openDowntime.workOrder.number)}
-                  </Link>
-                </>
-              )}
-            </div>
-            {canWork && (
-              <form action={markAssetUp.bind(null, asset.id)}>
-                <button type="submit" className="btn-primary">
-                  Mark back up
-                </button>
-              </form>
+      {/* Down: the one thing on this page that has to stand out */}
+      {openDowntime && (
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-red-50 px-4 py-3 text-sm ring-1 ring-red-200">
+          <div>
+            <strong className="text-red-800">Down for {formatDuration(downtimeHours([openDowntime], openDowntime.startedAt, now, now))}</strong>
+            {openDowntime.reason && <span className="text-red-800"> — {openDowntime.reason}</span>}
+            {openDowntime.workOrder && (
+              <>
+                {" · "}
+                <Link href={`/work-orders/${openDowntime.workOrder.id}`} className="link">
+                  {woNumber(openDowntime.workOrder.number)}
+                </Link>
+              </>
             )}
-          </>
-        ) : (
-          <>
-            <span className="text-slate-600">
-              Down {formatDuration(last30)} in the last 30 days{asset.downtimes.length ? "" : " (no downtime logged)"}.
-            </span>
-            {canWork && <DownForm action={markAssetDown.bind(null, asset.id)} />}
-          </>
-        )}
-      </div>
+          </div>
+          {canWork && (
+            <form action={markAssetUp.bind(null, asset.id)}>
+              <button type="submit" className="btn-primary">
+                Mark back up
+              </button>
+            </form>
+          )}
+        </div>
+      )}
 
       {/* Tabs */}
       <nav className="mb-5 flex gap-1 overflow-x-auto border-b border-slate-200 text-sm" aria-label="Asset sections">

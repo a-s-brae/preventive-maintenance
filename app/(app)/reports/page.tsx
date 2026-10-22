@@ -7,6 +7,7 @@ import { formatHours, parseRange, RANGE_PRESETS, TYPE_ORDER } from "@/lib/report
 import { TYPE_LABEL } from "@/lib/work-orders";
 import { BarList, ColumnChart, Legend, type Series } from "@/components/charts";
 import { Card, PageHeader } from "@/components/ui";
+import { MoreMenu } from "@/components/more-menu";
 
 export const dynamic = "force-dynamic";
 
@@ -44,9 +45,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <PageHeader title="Reports">
-        <a href={exportHref} className="btn-secondary">
-          Export CSV
-        </a>
+        <MoreMenu items={[{ label: "Export to Excel (CSV)", href: exportHref, download: true }]} />
       </PageHeader>
 
       {/* Date range */}

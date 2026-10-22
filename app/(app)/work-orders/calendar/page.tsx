@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getOpenWorkOrders, getPmSchedules } from "@/lib/queries";
 import { addInterval, fixedOccurrence } from "@/lib/schedule";
 import { woNumber } from "@/lib/work-orders";
+import { WorkOrderTabs } from "@/components/section-tabs";
 import { ButtonLink, Card, PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -79,12 +80,10 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeader title="Calendar">
-        <ButtonLink href="/work-orders" variant="secondary">
-          List
-        </ButtonLink>
-        <ButtonLink href="/work-orders/new">New work order</ButtonLink>
+      <PageHeader title="Work orders">
+        <ButtonLink href="/work-orders/new">+ Work order</ButtonLink>
       </PageHeader>
+      <WorkOrderTabs active="calendar" />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">

@@ -32,6 +32,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const now = new Date();
   const attention = open.filter((wo) => wo.due.status === "OVERDUE" || wo.due.status === "DUE_SOON");
   const mine = open.filter((wo) => wo.assignedToId === user.id);
+  // Requests to review and low stock sit beside the work lists on wide screens.
+  const side = pendingRequests.length > 0 || lowStock.length > 0;
 
   return (
     <>
@@ -41,9 +43,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       </PageHeader>
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <Stat label="Overdue" value={open.filter((wo) => wo.due.status === "OVERDUE").length} tone="text-red-700" href="/work-orders" />
-        <Stat label="Due this week" value={open.filter((wo) => wo.due.status === "DUE_SOON").length} tone="text-amber-700" href="/work-orders" />
-        <Stat label="In progress" value={open.filter((wo) => wo.status === "IN_PROGRESS").length} tone="text-violet-700" href="/work-orders" />
+        <Stat label="Overdue" value={open.filter((wo) => wo.due.status === "OVERDUE").length} tone="text-red-700" href="/work-orders?due=overdue" />
+        <Stat label="Due this week" value={open.filter((wo) => wo.due.status === "DUE_SOON").length} tone="text-amber-700" href="/work-orders?due=soon" />
+        <Stat label="In progress" value={open.filter((wo) => wo.status === "IN_PROGRESS").length} tone="text-violet-700" href="/work-orders?status=IN_PROGRESS" />
         <Stat label="Assigned to me" value={mine.length} tone="text-sky-700" href="/work-orders?view=mine" />
       </div>
 
@@ -100,76 +102,84 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
               </ul>
             </section>
           )}
-          {pendingRequests.length > 0 && (
-            <Card
-              title="Requests waiting for review"
-              actions={
-                <Link href="/requests" className="link text-sm">
-                  All requests →
-                </Link>
-              }
-            >
-              <ul className="divide-y divide-slate-100 text-sm">
-                {pendingRequests.map((r) => (
-                  <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-                    <div>
-                      <Link href={`/requests/${r.id}`} className="link">
-                        {r.title}
+          <div className={`grid gap-6 ${side ? "xl:grid-cols-3" : ""}`}>
+            <div className="space-y-6 xl:col-span-2">
+              <Card
+                title="Needs attention"
+                actions={
+                  <Link href="/work-orders" className="link text-sm">
+                    All work orders →
+                  </Link>
+                }
+              >
+                <OpenWorkOrderList rows={attention} empty="Nothing overdue or due this week. Nice." />
+              </Card>
+              {mine.length > 0 && (
+                <Card title="Assigned to me">
+                  <OpenWorkOrderList rows={mine} empty="" />
+                </Card>
+              )}
+            </div>
+            {side && (
+              <div className="space-y-6">
+                {pendingRequests.length > 0 && (
+                  <Card
+                    title="Requests waiting for review"
+                    actions={
+                      <Link href="/requests" className="link text-sm">
+                        All requests →
                       </Link>
-                      <div className="text-xs text-slate-500">
-                        {[requestNumber(r.number), r.asset?.name ?? "no equipment given", r.requestedBy && userLabel(r.requestedBy)].filter(Boolean).join(" · ")}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {r.assetDown && <DownBadge />}
-                      <PriorityText priority={r.priority} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-          {lowStock.length > 0 && (
-            <Card
-              title="Low stock"
-              actions={
-                <Link href="/parts?stock=low" className="link text-sm">
-                  All parts →
-                </Link>
-              }
-            >
-              <ul className="divide-y divide-slate-100 text-sm">
-                {lowStock.slice(0, 6).map((p) => (
-                  <li key={p.id} className="flex items-center justify-between gap-2 py-2">
-                    <Link href={`/parts/${p.id}`} className="link">
-                      {p.name}
-                    </Link>
-                    <span className="flex items-center gap-2 text-slate-600">
-                      <span className="tabular-nums">
-                        {formatQty(p.quantity)} {p.unit} left
-                      </span>
-                      <StockBadge status={stockStatus(p)} />
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </Card>
-          )}
-          <Card
-            title="Needs attention"
-            actions={
-              <Link href="/work-orders" className="link text-sm">
-                All work orders →
-              </Link>
-            }
-          >
-            <OpenWorkOrderList rows={attention} empty="Nothing overdue or due this week. Nice." />
-          </Card>
-          {mine.length > 0 && (
-            <Card title="Assigned to me">
-              <OpenWorkOrderList rows={mine} empty="" />
-            </Card>
-          )}
+                    }
+                  >
+                    <ul className="divide-y divide-slate-100 text-sm">
+                      {pendingRequests.map((r) => (
+                        <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
+                          <div>
+                            <Link href={`/requests/${r.id}`} className="link">
+                              {r.title}
+                            </Link>
+                            <div className="text-xs text-slate-500">
+                              {[requestNumber(r.number), r.asset?.name ?? "no equipment given", r.requestedBy && userLabel(r.requestedBy)].filter(Boolean).join(" · ")}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {r.assetDown && <DownBadge />}
+                            <PriorityText priority={r.priority} />
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                )}
+                {lowStock.length > 0 && (
+                  <Card
+                    title="Low stock"
+                    actions={
+                      <Link href="/parts?stock=low" className="link text-sm">
+                        All parts →
+                      </Link>
+                    }
+                  >
+                    <ul className="divide-y divide-slate-100 text-sm">
+                      {lowStock.slice(0, 6).map((p) => (
+                        <li key={p.id} className="flex items-center justify-between gap-2 py-2">
+                          <Link href={`/parts/${p.id}`} className="link">
+                            {p.name}
+                          </Link>
+                          <span className="flex items-center gap-2 text-slate-600">
+                            <span className="tabular-nums">
+                              {formatQty(p.quantity)} {p.unit} left
+                            </span>
+                            <StockBadge status={stockStatus(p)} />
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </>

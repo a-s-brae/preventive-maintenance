@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { getLocationTree } from "@/lib/queries";
 import { descendantIds } from "@/lib/tree";
+import { EquipmentTabs } from "@/components/section-tabs";
 import { ButtonLink, Card, Empty, PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -24,11 +25,12 @@ export default async function LocationsPage() {
 
   return (
     <>
-      <PageHeader title="Locations">
+      <PageHeader title="Equipment">
         {can(me.role, "manage") && <ButtonLink href="/locations/new">+ Location</ButtonLink>}
       </PageHeader>
-      <p className="-mt-3 mb-6 text-sm text-slate-600">
-        Organize equipment by where it is, e.g. <em>Main plant › Molding › Line 3</em>. Counts include everything inside a location.
+      <EquipmentTabs active="locations" />
+      <p className="mb-4 text-sm text-slate-600">
+        Where equipment is, e.g. <em>Main plant › Molding › Line 3</em>. Counts include everything inside a location.
       </p>
       <Card>
         {locations.length === 0 ? (

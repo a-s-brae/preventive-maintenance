@@ -126,12 +126,48 @@ export function DueText({ due, meterUnit }: { due: DueInfo; meterUnit: string | 
   return <span>{parts.join(" · ") || "—"}</span>;
 }
 
-export function PageHeader({ title, children }: { title: string; children?: React.ReactNode }) {
+/** Page title with its actions on the right: one main button, plus a More menu for the rest. */
+export function PageHeader({ title, children, description }: { title: string; children?: React.ReactNode; description?: React.ReactNode }) {
   return (
-    <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-      <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-      <div className="flex gap-2">{children}</div>
+    <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        {description && <p className="mt-1 max-w-3xl text-sm text-slate-600">{description}</p>}
+      </div>
+      {children && <div className="flex flex-wrap items-center gap-2">{children}</div>}
     </div>
+  );
+}
+
+export interface TabLink {
+  key: string;
+  label: string;
+  href: string;
+  count?: number;
+}
+
+/** Tabs between the pages of one section (e.g. Assets · Locations). */
+export function Tabs({ tabs, active, label }: { tabs: TabLink[]; active: string; label: string }) {
+  if (tabs.length < 2) return null;
+  return (
+    <nav aria-label={label} className="-mx-4 mb-5 overflow-x-auto border-b border-slate-200 px-4 lg:mx-0 lg:px-0">
+      <ul className="flex gap-6 text-sm">
+        {tabs.map((t) => (
+          <li key={t.key}>
+            <Link
+              href={t.href}
+              aria-current={t.key === active ? "page" : undefined}
+              className={`-mb-px inline-flex items-center gap-1.5 border-b-2 py-2.5 whitespace-nowrap ${
+                t.key === active ? "border-sky-700 font-medium text-sky-800" : "border-transparent text-slate-600 hover:border-slate-300 hover:text-slate-900"
+              }`}
+            >
+              {t.label}
+              {t.count != null && t.count > 0 && <span className="rounded-full bg-slate-100 px-1.5 text-xs text-slate-600">{t.count}</span>}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 
@@ -145,10 +181,10 @@ export function ButtonLink({ href, children, variant = "primary" }: { href: stri
 
 export function Card({ title, children, actions }: { title?: string; children: React.ReactNode; actions?: React.ReactNode }) {
   return (
-    <section className="rounded-lg border border-slate-200 bg-white shadow-sm">
+    <section className="rounded-lg border border-slate-200 bg-white">
       {(title || actions) && (
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <h2 className="font-medium">{title}</h2>
+        <div className="flex items-center justify-between gap-3 px-4 pt-4">
+          <h2 className="font-semibold text-slate-900">{title}</h2>
           <div className="flex gap-2">{actions}</div>
         </div>
       )}

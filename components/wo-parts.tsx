@@ -5,7 +5,6 @@ import { formatMoney, formatQty, partsCost } from "@/lib/parts";
 import { userLabel } from "@/lib/queries";
 import { ConfirmButton } from "./form";
 import { UsePartForm } from "./part-forms";
-import { Empty } from "./ui";
 
 type Usage = PartUsage & { part: Part; usedBy: User | null };
 
@@ -21,9 +20,9 @@ export function WorkOrderParts({
   canEdit: boolean;
 }) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {usages.length === 0 ? (
-        <Empty>No parts used yet.</Empty>
+        !canEdit && <p className="text-sm text-slate-500">None.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="table">

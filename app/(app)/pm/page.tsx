@@ -6,6 +6,8 @@ import { formatDate } from "@/lib/forms";
 import { getPmSchedules, userLabel } from "@/lib/queries";
 import { describeInterval } from "@/lib/schedule";
 import { woNumber } from "@/lib/work-orders";
+import { MoreMenu } from "@/components/more-menu";
+import { PmTabs } from "@/components/section-tabs";
 import { Card, DueText, Empty, PageHeader, StatusBadge } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -16,12 +18,11 @@ export default async function PmSchedulesPage() {
   return (
     <>
       <PageHeader title="PM schedules">
-        <a href="/pm/export" className="btn-secondary" download>
-          Export CSV
-        </a>
+        <MoreMenu items={[{ label: "Export to Excel (CSV)", href: "/pm/export", download: true }]} />
       </PageHeader>
-      <p className="-mt-3 mb-6 text-sm text-slate-600">
-        Each schedule creates a work order when it comes due. To add a schedule, open an asset and choose <strong>Add PM schedule</strong>.
+      <PmTabs active="schedules" showChecklists={can(me.role, "manage")} />
+      <p className="mb-4 text-sm text-slate-600">
+        Each schedule creates a work order when it comes due. To add one, open the equipment and go to its <strong>PM schedules</strong> tab.
       </p>
       <Card>
         {rows.length === 0 ? (

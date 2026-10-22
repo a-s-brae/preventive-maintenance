@@ -4,6 +4,7 @@ import { requirePermission } from "@/auth";
 import { db } from "@/lib/db";
 import { formatMoney, formatQty, stockStatus } from "@/lib/parts";
 import { can } from "@/lib/permissions";
+import { MoreMenu } from "@/components/more-menu";
 import { ButtonLink, Card, Empty, PageHeader, StockBadge } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -31,33 +32,35 @@ export default async function PartsPage({ searchParams }: { searchParams: Promis
   return (
     <>
       <PageHeader title="Parts">
-        <a href="/parts/export" className="btn-secondary" download>
-          Export CSV
-        </a>
-        {can(me.role, "manage") && (
-          <ButtonLink href="/parts/import" variant="secondary">
-            Import
-          </ButtonLink>
-        )}
+        <MoreMenu
+          items={[
+            ...(can(me.role, "manage") ? [{ label: "Import from Excel (CSV)", href: "/parts/import" }] : []),
+            { label: "Export to Excel (CSV)", href: "/parts/export", download: true },
+          ]}
+        />
         {can(me.role, "manage") && <ButtonLink href="/parts/new">+ Part</ButtonLink>}
       </PageHeader>
-      <form className="mb-3 flex flex-wrap items-center gap-2">
-        <input name="q" defaultValue={q} placeholder="Search name, part #, vendor, bin…" className="input w-72" />
-        {stock && <input type="hidden" name="stock" value={stock} />}
-        <label className="flex items-center gap-2 px-1 text-sm text-slate-600">
-          <input type="checkbox" name="all" value="1" defaultChecked={!!all} className="size-4" /> Include retired
-        </label>
-        <button className="btn-secondary">Search</button>
-      </form>
-      <div className="mb-4 flex flex-wrap items-center gap-3 text-sm">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <form role="search" className="w-full sm:w-72">
+          <input name="q" type="search" defaultValue={q} placeholder="Search parts, numbers, bins…" aria-label="Search parts" className="input" />
+          {stock && <input type="hidden" name="stock" value={stock} />}
+          {all && <input type="hidden" name="all" value="1" />}
+        </form>
         <Link
           href={qs({ stock: stock ? undefined : "low" })}
           aria-pressed={!!stock}
-          className={`rounded-full px-2.5 py-0.5 text-xs ring-1 ring-inset ${stock ? "bg-amber-500 text-slate-900 ring-amber-500" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}
+          className={`rounded-full px-3 py-1 text-sm ring-1 ring-inset ${stock ? "bg-amber-500 text-slate-900 ring-amber-500" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}
         >
           Low or out of stock{lowCount ? ` (${lowCount})` : ""}
         </Link>
-        <span className="text-xs text-slate-500">Stock value: {formatMoney(value)}</span>
+        <Link
+          href={qs({ all: all ? undefined : "1" })}
+          aria-pressed={!!all}
+          className={`rounded-full px-3 py-1 text-sm ring-1 ring-inset ${all ? "bg-sky-700 text-white ring-sky-700" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}
+        >
+          Show retired
+        </Link>
+        <span className="ml-auto text-sm text-slate-500">Stock value {formatMoney(value)}</span>
       </div>
       <Card>
         {parts.length === 0 ? (

@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 
 type Counts = { overdue: number; mine: number; pendingRequests: number; lowStock: number; unread: number };
 type Role = "ADMIN" | "TECH" | "REQUESTER";
@@ -21,34 +21,39 @@ function navSections(counts: Counts, role: Role): { title?: string; items: NavIt
     ];
   }
   return [
-    { items: [{ href: "/", label: "Dashboard", icon: "home" }] },
     {
-      title: "Work orders",
       items: [
-        { href: "/work-orders", label: "Open", icon: "clipboard", badge: { count: counts.overdue, tone: "red", title: "overdue" } },
-        { href: "/work-orders?view=mine", label: "Assigned to me", icon: "user", badge: { count: counts.mine, tone: "blue", title: "open, assigned to you" } },
+        { href: "/", label: "Dashboard", icon: "home" },
+        { href: "/work-orders", label: "Work orders", icon: "clipboard", badge: { count: counts.overdue, tone: "red", title: "overdue" } },
         { href: "/requests", label: "Requests", icon: "inbox", badge: { count: counts.pendingRequests, tone: "amber", title: "waiting for review" } },
-        { href: "/work-orders/calendar", label: "Calendar", icon: "calendar" },
-        { href: "/history", label: "History", icon: "clock" },
-      ],
-    },
-    {
-      title: "Equipment",
-      items: [
-        { href: "/assets", label: "Assets", icon: "cube" },
-        { href: "/locations", label: "Locations", icon: "pin" },
+        { href: "/assets", label: "Equipment", icon: "cube" },
         { href: "/parts", label: "Parts", icon: "box", badge: { count: counts.lowStock, tone: "amber", title: "low or out of stock" } },
-      ],
-    },
-    {
-      title: "Planning",
-      items: [
         { href: "/pm", label: "PM schedules", icon: "repeat" },
-        ...(role === "ADMIN" ? [{ href: "/checklists", label: "Checklists", icon: "list" } as NavItem] : []),
         { href: "/reports", label: "Reports", icon: "chart" },
       ],
     },
     ...(role === "ADMIN" ? [{ title: "Admin", items: [{ href: "/people", label: "People", icon: "users" } as NavItem] }] : []),
+  ];
+}
+
+/** The pages each sidebar link covers (its tabs and sub-pages). */
+const SECTION_PATHS: Record<string, string[]> = {
+  "/work-orders": ["/work-orders", "/history"],
+  "/assets": ["/assets", "/locations"],
+  "/pm": ["/pm", "/checklists", "/tasks"],
+};
+
+/** What "+ New" offers, by role. */
+function newItems(role: Role): { href: string; label: string }[] {
+  return [
+    { href: "/work-orders/new", label: "Work order" },
+    { href: "/requests/new", label: "Report a problem" },
+    ...(role === "ADMIN"
+      ? [
+          { href: "/assets/new", label: "Equipment (asset)" },
+          { href: "/parts/new", label: "Part" },
+        ]
+      : []),
   ];
 }
 
@@ -90,14 +95,16 @@ export function AppShell({
         <Bell count={counts.unread} className="-mr-1.5 hidden text-slate-300 hover:bg-white/10 hover:text-white lg:flex" />
       </div>
       <div className="px-3 pb-4">
-        <Link href="/requests/new" className="flex items-center justify-center gap-2 rounded-md bg-amber-500 px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-amber-400">
-          <Icon name="alert" />
-          Report a problem
-        </Link>
+        {role === "REQUESTER" ? (
+          <Link href="/requests/new" className="flex items-center justify-center gap-2 rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500">
+            <Icon name="alert" />
+            Report a problem
+          </Link>
+        ) : (
+          <NewMenu items={newItems(role)} />
+        )}
       </div>
-      <Suspense fallback={<Nav counts={counts} role={role} />}>
-        <ActiveNav counts={counts} role={role} />
-      </Suspense>
+      <Nav counts={counts} role={role} pathname={pathname} />
       <form action={signOutAction} className="border-t border-white/10 px-5 py-4 text-sm">
         <div className="truncate text-slate-400" title={email}>
           {email}
@@ -147,29 +154,15 @@ export function AppShell({
       )}
 
       <main className="lg:pl-60">
-        <div className="mx-auto max-w-6xl px-4 py-6 lg:px-8 lg:py-8">{children}</div>
+        <div className="px-4 py-6 lg:px-8 lg:py-7">{children}</div>
       </main>
     </>
   );
 }
 
-function ActiveNav({ counts, role }: { counts: Counts; role: Role }) {
-  const pathname = usePathname();
-  const params = useSearchParams();
-  const isActive = (href: string) => {
-    const [path, query] = href.split("?");
-    if (path === "/") return pathname === "/";
-    if (path === "/work-orders" && pathname === "/work-orders") {
-      // "Open" and "Assigned to me" share a path; tell them apart by view.
-      return (new URLSearchParams(query).get("view") ?? "open") === (params.get("view") ?? "open");
-    }
-    if (path === "/work-orders") return /^\/work-orders\/(?!calendar)/.test(pathname);
-    return pathname === path || pathname.startsWith(`${path}/`) || (path === "/assets" && pathname.startsWith("/tasks/"));
-  };
-  return <Nav counts={counts} role={role} isActive={isActive} />;
-}
-
-function Nav({ counts, role, isActive = () => false }: { counts: Counts; role: Role; isActive?: (href: string) => boolean }) {
+function Nav({ counts, role, pathname }: { counts: Counts; role: Role; pathname: string }) {
+  const isActive = (href: string) =>
+    href === "/" ? pathname === "/" : (SECTION_PATHS[href] ?? [href]).some((p) => pathname === p || pathname.startsWith(`${p}/`));
   return (
     <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4" aria-label="Main">
       {navSections(counts, role).map((section, i) => (
@@ -207,6 +200,45 @@ function Nav({ counts, role, isActive = () => false }: { counts: Counts; role: R
         </div>
       ))}
     </nav>
+  );
+}
+
+/** "+ New": the things staff create most, one click away from anywhere. */
+function NewMenu({ items }: { items: { href: string; label: string }[] }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => !ref.current?.contains(e.target as Node) && setOpen(false);
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    document.addEventListener("mousedown", onClick);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onClick);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="flex w-full items-center justify-center gap-2 rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500"
+      >
+        <span aria-hidden="true" className="text-base leading-none">+</span> New
+      </button>
+      {open && (
+        <div role="menu" className="absolute inset-x-0 z-50 mt-1 overflow-hidden rounded-md bg-white py-1 shadow-lg ring-1 ring-slate-200">
+          {items.map((item) => (
+            <Link key={item.href} role="menuitem" href={item.href} onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
+              {item.label}
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 

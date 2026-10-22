@@ -21,8 +21,8 @@ computer (`npm run local`) or hosted on Vercel.
 | **Assets** | Name, tag, category, location, make/model/serial, status (active / inactive / retired), optional meter (hours, cycles, miles…). Asset pages show open work orders, PM schedules and history. |
 | **Meter readings** | Log a reading any time (or when completing a work order). Readings can't go backwards. |
 | **Checklist autosave** | Each answer (and its optional note) is saved the moment it's entered, so a PM interrupted halfway keeps its answers. The first answer moves the work order to In progress. |
-| **Lists** | Filter chips for due / status / priority, search, and **Export CSV** on work orders, PM schedules and assets (the export matches the filters on screen). |
-| **Navigation** | Left sidebar with badges (overdue work orders, work assigned to you); a slide-out menu on phones and tablets. |
+| **Lists** | Filter chips for due / status / priority, search, and **Export to Excel (CSV) under More** on work orders, PM schedules and assets (the export matches the filters on screen). |
+| **Navigation** | A short sidebar (Dashboard, Work orders, Requests, Equipment, Parts, PM schedules, Reports, and People for admins) with badges for what needs attention. Related pages are tabs inside each section (e.g. Work orders: Open · Assigned to me · Calendar · Completed). **+ New** creates a work order, request, asset or part from anywhere. Each page has one main button; exports, imports and printing are under **More**. Full screen width; a slide-out menu on phones. |
 | **Locations** | A tree (plant → area → line). Each location shows the equipment in it and below it, and its open work orders. Existing free-text locations were converted automatically. |
 | **Equipment tree** | Assets can sit under a parent (a dryer under its compressor). The asset list shows the tree, filters by location (including sub-locations) and by "down now". |
 | **Asset page** | Tabs: Overview (details, meter, sub-assets, open work) · Work orders · PM schedules · Downtime · Meter readings. |

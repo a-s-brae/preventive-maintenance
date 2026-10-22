@@ -7,6 +7,9 @@ import { formatNumber } from "@/lib/forms";
 import { getLocationTree } from "@/lib/queries";
 import { compareDue, computeDue } from "@/lib/schedule";
 import { descendantIds, flattenTree } from "@/lib/tree";
+import { AutoSubmitSelect } from "@/components/auto-submit";
+import { MoreMenu } from "@/components/more-menu";
+import { EquipmentTabs } from "@/components/section-tabs";
 import { TreeOptions } from "@/components/tree-select";
 import { ButtonLink, Card, DownBadge, Empty, PageHeader, StatusBadge } from "@/components/ui";
 
@@ -52,42 +55,43 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <PageHeader title="Assets">
-        <a href="/assets/export" className="btn-secondary" download>
-          Export CSV
-        </a>
-        <a href={`/print/labels${location ? `?location=${location}` : ""}`} target="_blank" rel="noreferrer" className="btn-secondary">
-          QR labels
-        </a>
-        {can(me.role, "manage") && (
-          <ButtonLink href="/assets/import" variant="secondary">
-            Import
-          </ButtonLink>
-        )}
+      <PageHeader title="Equipment">
+        <MoreMenu
+          items={[
+            ...(can(me.role, "manage") ? [{ label: "Import from Excel (CSV)", href: "/assets/import" }] : []),
+            { label: "Export to Excel (CSV)", href: "/assets/export", download: true },
+            { label: "Print QR labels", href: `/print/labels${location ? `?location=${location}` : ""}`, newTab: true },
+          ]}
+        />
         {can(me.role, "manage") && <ButtonLink href={`/assets/new${location ? `?locationId=${location}` : ""}`}>+ Asset</ButtonLink>}
       </PageHeader>
-      <form className="mb-3 flex flex-wrap items-center gap-2">
-        <input name="q" defaultValue={q} placeholder="Search name, tag, model…" className="input w-64" />
-        <select name="location" defaultValue={location ?? ""} className="input w-auto max-w-xs">
-          <option value="">All locations</option>
-          <TreeOptions options={locations} />
-        </select>
-        {down && <input type="hidden" name="down" value="1" />}
-        <label className="flex items-center gap-2 px-1 text-sm text-slate-600">
-          <input type="checkbox" name="all" value="1" defaultChecked={!!all} className="size-4" /> Include retired
-        </label>
-        <button className="btn-secondary">Filter</button>
-      </form>
-      <div className="mb-4 flex items-center gap-3 text-sm">
+      <EquipmentTabs active="assets" />
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <form role="search" className="flex w-full flex-wrap gap-2 sm:w-auto">
+          <input name="q" type="search" defaultValue={q} placeholder="Search equipment…" aria-label="Search equipment" className="input sm:w-64" />
+          <AutoSubmitSelect name="location" defaultValue={location ?? ""} aria-label="Location" className="input w-auto max-w-xs">
+            <option value="">All locations</option>
+            <TreeOptions options={locations} />
+          </AutoSubmitSelect>
+          {down && <input type="hidden" name="down" value="1" />}
+          {all && <input type="hidden" name="all" value="1" />}
+        </form>
         <Link
           href={qs({ down: down ? undefined : "1" })}
           aria-pressed={!!down}
-          className={`rounded-full px-2.5 py-0.5 text-xs ring-1 ring-inset ${down ? "bg-red-600 text-white ring-red-600" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}
+          className={`rounded-full px-3 py-1 text-sm ring-1 ring-inset ${down ? "bg-red-600 text-white ring-red-600" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}
         >
           Down now
         </Link>
+        <Link
+          href={qs({ all: all ? undefined : "1" })}
+          aria-pressed={!!all}
+          className={`rounded-full px-3 py-1 text-sm ring-1 ring-inset ${all ? "bg-sky-700 text-white ring-sky-700" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}
+        >
+          Show retired
+        </Link>
         {(q || location || down || all) && (
-          <Link href="/assets" className="link text-xs">
+          <Link href="/assets" className="link text-sm">
             Clear filters
           </Link>
         )}

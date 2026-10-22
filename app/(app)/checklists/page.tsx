@@ -2,6 +2,7 @@ import { requirePermission } from "@/auth";
 import Link from "next/link";
 import { db } from "@/lib/db";
 import { parseChecklist } from "@/lib/checklist";
+import { PmTabs } from "@/components/section-tabs";
 import { ButtonLink, Card, Empty, PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -11,10 +12,11 @@ export default async function ChecklistsPage() {
   const templates = await db.checklistTemplate.findMany({ orderBy: { name: "asc" }, include: { _count: { select: { tasks: true } } } });
   return (
     <>
-      <PageHeader title="Checklist templates">
+      <PageHeader title="PM schedules">
         <ButtonLink href="/checklists/new">+ Template</ButtonLink>
       </PageHeader>
-      <p className="-mt-3 mb-6 max-w-2xl text-sm text-slate-600">
+      <PmTabs active="checklists" showChecklists />
+      <p className="mb-4 max-w-3xl text-sm text-slate-600">
         Write a checklist once and use it on many PM schedules — one forklift inspection for every forklift. Change the template and every PM
         that follows it changes too.
       </p>

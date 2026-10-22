@@ -3,6 +3,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { workOrderInclude } from "@/lib/queries";
 import { CompletedWorkOrderTable } from "@/components/work-order-table";
+import { WorkOrderTabs } from "@/components/section-tabs";
 import { Card, PageHeader } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +28,8 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <PageHeader title="Maintenance history" />
+      <PageHeader title="Work orders" description="Every completed work order, newest first." />
+      <WorkOrderTabs active="complete" />
       <Card>
         <CompletedWorkOrderTable rows={rows} />
         {pages > 1 && (

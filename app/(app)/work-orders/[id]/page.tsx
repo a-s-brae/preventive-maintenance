@@ -17,7 +17,8 @@ import { WorkOrderLabor } from "@/components/wo-labor";
 import { WorkOrderParts } from "@/components/wo-parts";
 import { ChecklistResults } from "@/components/checklist-results";
 import { CompleteForm } from "@/components/complete-form";
-import { ButtonLink, Card, PriorityText, StatusBadge, WoDueText, WoStatusBadge } from "@/components/ui";
+import { MoreMenu } from "@/components/more-menu";
+import { Card, PriorityText, StatusBadge, WoDueText, WoStatusBadge } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -147,19 +148,30 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
             {woNumber(wo.number)} <WoStatusBadge status={wo.status} />
           </div>
           <h1 className="mt-1 text-2xl font-semibold tracking-tight">{wo.title}</h1>
+          {/* The essentials, so they're visible on a phone without scrolling to Details. */}
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-600">
+            <Link href={`/assets/${wo.asset.id}`} className="link">
+              {wo.asset.name}
+            </Link>
+            {wo.asset.location && <span>· {wo.asset.location.name}</span>}
+            {!complete && due.status !== "NO_SCHEDULE" && (
+              <span className="inline-flex items-center gap-1">
+                · <StatusBadge status={due.status} />
+              </span>
+            )}
+            <span>· {userLabel(wo.assignedTo)}</span>
+          </div>
         </div>
-        <div className="flex flex-wrap gap-2">
-          {canWork && wo.status === "OPEN" && statusButton("IN_PROGRESS", "Start work", true)}
+        <div className="flex flex-wrap items-center gap-2">
+          <MoreMenu
+            items={[
+              ...(canWork && !complete ? [{ label: "Edit work order", href: `/work-orders/${wo.id}/edit` }] : []),
+              { label: "Print record", href: `/print/work-orders/${wo.id}`, newTab: true },
+            ]}
+          />
           {canWork && wo.status === "IN_PROGRESS" && statusButton("ON_HOLD", "Put on hold")}
+          {canWork && wo.status === "OPEN" && statusButton("IN_PROGRESS", "Start work", true)}
           {canWork && wo.status === "ON_HOLD" && statusButton("IN_PROGRESS", "Resume", true)}
-          {canWork && !complete && (
-            <ButtonLink href={`/work-orders/${wo.id}/edit`} variant="secondary">
-              Edit
-            </ButtonLink>
-          )}
-          <a href={`/print/work-orders/${wo.id}`} target="_blank" rel="noreferrer" className="btn-secondary">
-            Print
-          </a>
         </div>
       </div>
 
@@ -170,16 +182,13 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+        <div className="space-y-6">
           {(wo.description || wo.pmTask?.instructions) && (
             <Card title="Instructions">
               <p className="text-sm whitespace-pre-wrap">{wo.description ?? wo.pmTask?.instructions}</p>
             </Card>
           )}
-          <Card title="Time">
-            <WorkOrderLabor workOrderId={wo.id} entries={wo.labor} meId={me.id} canWork={canWork} canManage={canManage} open={!complete} />
-          </Card>
           {complete ? (
             <Card title="Results">
               <div className="space-y-4">
@@ -205,28 +214,41 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
               />
             </Card>
           )}
-          <Card title="Parts used">
-            <WorkOrderParts workOrderId={wo.id} usages={wo.partUsages} parts={parts} canEdit={canWork} />
-          </Card>
-          <Card title="Photos & files">
-            <Attachments
-              attachments={wo.attachments}
-              target={{ workOrderId: wo.id }}
-              canUpload={canWork}
-              canDelete={(a) => canWork && (a.uploadedById === me.id || canManage)}
-            />
+          <Card title="Time, parts & photos">
+            <div className="divide-y divide-slate-100">
+              <section className="pb-4">
+                <h3 className="mb-2 text-sm font-medium text-slate-500">Time</h3>
+                <WorkOrderLabor workOrderId={wo.id} entries={wo.labor} meId={me.id} canWork={canWork} canManage={canManage} open={!complete} />
+              </section>
+              <section className="py-4">
+                <h3 className="mb-2 text-sm font-medium text-slate-500">Parts used</h3>
+                <WorkOrderParts workOrderId={wo.id} usages={wo.partUsages} parts={parts} canEdit={canWork} />
+              </section>
+              <section className="pt-4">
+                <h3 className="mb-2 text-sm font-medium text-slate-500">Photos &amp; files</h3>
+                <Attachments
+                  attachments={wo.attachments}
+                  target={{ workOrderId: wo.id }}
+                  canUpload={canWork}
+                  canDelete={(a) => canWork && (a.uploadedById === me.id || canManage)}
+                  emptyText={canWork ? null : "None."}
+                />
+              </section>
+            </div>
           </Card>
         </div>
-        <Card title="Details">
-          <dl className="space-y-2.5 text-sm">
-            {details.map(([k, v]) => (
-              <div key={k} className="flex justify-between gap-4">
-                <dt className="text-slate-500">{k}</dt>
-                <dd className="text-right">{v}</dd>
-              </div>
-            ))}
-          </dl>
-        </Card>
+        <div className="self-start lg:sticky lg:top-6">
+          <Card title="Details">
+            <dl className="space-y-2.5 text-sm">
+              {details.map(([k, v]) => (
+                <div key={k} className="flex justify-between gap-4">
+                  <dt className="text-slate-500">{k}</dt>
+                  <dd className="text-right">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </Card>
+        </div>
       </div>
     </>
   );

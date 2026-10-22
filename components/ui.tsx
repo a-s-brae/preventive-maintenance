@@ -188,10 +188,22 @@ export function ButtonLink({ href, children, variant = "primary" }: { href: stri
   );
 }
 
-/** A soft grey panel with a small bold title. */
-export function Card({ title, children, actions, className = "" }: { title?: string; children: React.ReactNode; actions?: React.ReactNode; className?: string }) {
+/** A soft grey panel with a small bold title. `tour` names it for the guided tour. */
+export function Card({
+  title,
+  children,
+  actions,
+  className = "",
+  tour,
+}: {
+  title?: string;
+  children: React.ReactNode;
+  actions?: React.ReactNode;
+  className?: string;
+  tour?: string;
+}) {
   return (
-    <section className={`rounded-2xl bg-surface p-5 sm:p-6 ${className}`}>
+    <section className={`rounded-2xl bg-surface p-5 sm:p-6 ${className}`} data-tour={tour}>
       {(title || actions) && (
         <div className="mb-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <h2 className="text-sm font-semibold text-ink">{title}</h2>
@@ -248,7 +260,7 @@ export function StatTile({
 
 /** "+12% ↗" against an earlier period; green when the change is good. */
 export function Delta({ now, before, upIsGood = true, period }: { now: number; before: number; upIsGood?: boolean; period: string }) {
-  if (before === 0 && now === 0) return <span className="text-neutral-500">no change {period}</span>;
+  if (before === 0 && now === 0) return <span className="text-neutral-500" title={`none now or ${period}`}>no change</span>;
   const pct = before === 0 ? null : Math.round(((now - before) / before) * 100);
   const up = now > before;
   const flat = now === before;

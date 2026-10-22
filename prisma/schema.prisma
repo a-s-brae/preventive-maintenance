@@ -410,6 +410,10 @@ model User {
   active        Boolean   @default(true)
   /// Gets the daily overdue / due-today email.
   emailDigest   Boolean   @default(true)
+  /// The role they've had the welcome and tour for; shown again when their role changes.
+  welcomedAs    Role?
+  /// The role they hid the dashboard's getting-started card as.
+  guideHiddenAs Role?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

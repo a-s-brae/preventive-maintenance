@@ -7,6 +7,7 @@ import { cache } from "react";
 import type { Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { isAllowedEmail } from "@/lib/email-domains";
+import { notifyNewPerson } from "@/lib/notify";
 import { can, type Permission } from "@/lib/permissions";
 import { parseBasicAuth, passwordMatches, teamPassword } from "@/lib/team-password";
 
@@ -49,9 +50,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   events: {
-    // The very first person to sign in to a new system becomes its admin.
+    // The very first person to sign in to a new system becomes its admin;
+    // after that, admins are told someone new is here.
     createUser: async ({ user }) => {
-      if (user.id && (await db.user.count()) === 1) await db.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
+      if (!user.id) return;
+      if ((await db.user.count()) === 1) await db.user.update({ where: { id: user.id }, data: { role: "ADMIN" } });
+      else if (user.email) await notifyNewPerson(db, user.email);
     },
   },
 });
@@ -71,7 +75,9 @@ const teamPasswordUser = cache(async (): Promise<CurrentUser | null> => {
   if (existing) return existing;
   try {
     const first = (await db.user.count()) === 0;
-    return await db.user.create({ data: { email: login.email, role: first ? "ADMIN" : "REQUESTER" }, select });
+    const created = await db.user.create({ data: { email: login.email, role: first ? "ADMIN" : "REQUESTER" }, select });
+    if (!first) await notifyNewPerson(db, login.email);
+    return created;
   } catch (e) {
     // Another request from the same browser made it first.
     const created = await db.user.findUnique({ where: { email: login.email }, select });

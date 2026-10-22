@@ -5,11 +5,13 @@ import { loadSampleAssets } from "@/lib/actions";
 import { downtimeHours, formatDuration, requestNumber } from "@/lib/downtime";
 import { formatQty, stockStatus } from "@/lib/parts";
 import { can } from "@/lib/permissions";
+import { setupSteps, showsGuide } from "@/lib/onboarding";
 import { getAllOpenWorkOrders, userLabel } from "@/lib/queries";
 import { buckets, formatHours, pmCompliance } from "@/lib/reports";
 import { woNumber } from "@/lib/work-orders";
 import { Donut } from "@/components/charts";
 import { Columns, TrendCard } from "@/components/dash-charts";
+import { RequestGuide, SetupCard, WorkOrderGuide } from "@/components/getting-started";
 import { OpenWorkOrderList } from "@/components/work-order-table";
 import { ButtonLink, Card, Delta, DownBadge, Empty, PageHeader, PriorityText, RequestStatusBadge, StatTile, StockBadge } from "@/components/ui";
 
@@ -25,7 +27,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
       You don&apos;t have access to that page. Ask an admin if you need it.
     </p>
   );
-  if (!can(user.role, "view")) return <RequesterHome userId={user.id} notice={notice} />;
+  if (!can(user.role, "view")) return <RequesterHome userId={user.id} notice={notice} guide={await gettingStarted(user)} />;
 
   const now = new Date();
   const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
@@ -37,7 +39,8 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const since60 = new Date(now.getTime() - 60 * DAY);
   const last90 = { from: new Date(tomorrow.getTime() - 90 * DAY), to: tomorrow };
 
-  const [open, assetCount, down, pendingRequests, parts, flow, downtimes, pmWorkOrders] = await Promise.all([
+  const [guide, open, assetCount, down, pendingRequests, parts, flow, downtimes, pmWorkOrders] = await Promise.all([
+    gettingStarted(user),
     getAllOpenWorkOrders(),
     db.asset.count(),
     db.downtime.findMany({ where: { endedAt: null }, orderBy: { startedAt: "asc" }, include: { asset: true, workOrder: true } }),
@@ -138,7 +141,9 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         </section>
       )}
 
-      <div className="mb-6 grid grid-cols-2 gap-4 @3xl:grid-cols-4 @3xl:gap-6">
+      {guide}
+
+      <div className="mb-6 grid grid-cols-2 gap-4 @3xl:grid-cols-4 @3xl:gap-6" data-tour="tiles">
         <StatTile label="Overdue" value={overdue} detail={`of ${open.length} open`} alert={overdue > 0} href="/work-orders?due=overdue" />
         <StatTile tone="blue" label="Due this week" value={open.filter((wo) => wo.due.status === "DUE_SOON").length} detail="next 7 days" href="/work-orders?due=soon" />
         <StatTile
@@ -232,6 +237,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <div className={`grid gap-6 ${side ? "@6xl:grid-cols-3" : ""}`}>
             <div className="space-y-6 @6xl:col-span-2">
               <Card
+                tour="attention"
                 title="Needs attention"
                 actions={
                   <Link href="/work-orders" className="text-xs text-neutral-500 hover:text-ink">
@@ -335,8 +341,25 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   );
 }
 
+/** The getting-started card for this person, unless they've hidden it. */
+async function gettingStarted(user: { id: string; role: "ADMIN" | "TECH" | "REQUESTER" }): Promise<React.ReactNode> {
+  const me = await db.user.findUnique({ where: { id: user.id }, select: { guideHiddenAs: true } });
+  if (!showsGuide({ role: user.role, guideHiddenAs: me?.guideHiddenAs ?? null })) return null;
+  if (user.role === "TECH") return <WorkOrderGuide />;
+  if (user.role === "REQUESTER") return <RequestGuide />;
+  const [locations, assets, pmSchedules, parts, staff, completedWorkOrders] = await Promise.all([
+    db.location.count(),
+    db.asset.count(),
+    db.pmTask.count({ where: { active: true } }),
+    db.part.count({ where: { active: true } }),
+    db.user.count({ where: { active: true, role: { in: ["ADMIN", "TECH"] } } }),
+    db.workOrder.count({ where: { status: "COMPLETE" } }),
+  ]);
+  return <SetupCard steps={setupSteps({ locations, assets, pmSchedules, parts, staff, completedWorkOrders })} />;
+}
+
 /** Home for requesters: report a problem and follow what they've reported. */
-async function RequesterHome({ userId, notice }: { userId: string; notice: React.ReactNode }) {
+async function RequesterHome({ userId, notice, guide }: { userId: string; notice: React.ReactNode; guide: React.ReactNode }) {
   const requests = await db.request.findMany({
     where: { requestedById: userId },
     orderBy: { createdAt: "desc" },
@@ -349,11 +372,12 @@ async function RequesterHome({ userId, notice }: { userId: string; notice: React
       <div className="mb-6 rounded-2xl bg-pastel-lavender p-6 text-center sm:p-8">
         <h1 className="text-lg font-semibold">Something wrong with equipment?</h1>
         <p className="mt-1 text-sm text-neutral-600">Tell maintenance — it takes a minute.</p>
-        <Link href="/requests/new" className="btn-primary mt-4 px-5 py-2.5">
+        <Link href="/requests/new" className="btn-primary mt-4 px-5 py-2.5" data-tour="report-big">
           Report a problem
         </Link>
       </div>
-      <Card title="My requests">
+      {guide}
+      <Card title="My requests" tour="my-requests">
         {requests.length === 0 ? (
           <Empty>You haven&apos;t reported anything yet.</Empty>
         ) : (

@@ -34,7 +34,13 @@ export default async function PeoplePage({ searchParams }: { searchParams: Promi
       <Card>
         <div className="divide-y divide-neutral-100">
           {people.map((p) => (
-            <PersonRow key={p.id} action={updatePerson.bind(null, p.id)} person={p} isMe={p.id === me.id} />
+            <PersonRow
+              key={p.id}
+              action={updatePerson.bind(null, p.id)}
+              person={p}
+              isMe={p.id === me.id}
+              isNew={p.active && p.role === "REQUESTER" && p.createdAt.getTime() > Date.now() - 14 * 86_400_000}
+            />
           ))}
         </div>
       </Card>

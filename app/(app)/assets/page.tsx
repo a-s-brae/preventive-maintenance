@@ -98,7 +98,9 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
       </div>
       <Card>
         {rows.length === 0 ? (
-          <Empty>No assets found.</Empty>
+          <Empty>
+            {q || location || down || all ? "No equipment matches." : "No equipment yet. Add your first machine, or import a list from Excel (More → Import)."}
+          </Empty>
         ) : (
           <div className="overflow-x-auto">
             <table className="table">

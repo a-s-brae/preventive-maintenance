@@ -252,7 +252,7 @@ async function PmTab({
   return (
     <Card title="PM schedules" actions={canManage && <ButtonLink href={`/assets/${assetId}/tasks/new`}>+ PM schedule</ButtonLink>}>
       {schedules.length === 0 ? (
-        <Empty>No PM schedules yet.</Empty>
+        <Empty>No PM schedules yet. Add one and work orders are made for you each time maintenance comes due.</Empty>
       ) : (
         <div className="overflow-x-auto">
           <table className="table">

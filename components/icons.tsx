@@ -29,6 +29,14 @@ const PATHS = {
   logout: "M14 4.5h4.5a.5.5 0 0 1 .5.5v14a.5.5 0 0 1-.5.5H14M10 8l-4 4 4 4m-4-4h10",
   check: "m5 12.5 4.5 4.5L19 7.5",
   down: "M12 3v4m0 10v4M3 12h4m10 0h4M6 6l2.5 2.5m7 7L18 18M6 18l2.5-2.5m7-7L18 6",
+  help: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18m-2.6-11.6a2.6 2.6 0 1 1 3.7 2.4c-.6.3-1.1.8-1.1 1.5v.6m0 3.1h.01",
+  arrowRight: "M5 12h14m-5-5 5 5-5 5",
+  arrowDown: "M12 5v14m-5-5 5 5 5-5",
+  play: "M8 5.5v13l10.5-6.5z",
+  qr: "M4 4h6v6H4zm10 0h6v6h-6zM4 14h6v6H4zm10 0h2v2h-2zm4 0h2v2h-2zm-4 4h2v2h-2zm4 0h2v2h-2z",
+  timer: "M12 21a8 8 0 1 0 0-16 8 8 0 0 0 0 16m0-12v4l2.5 2.5M10 2h4",
+  camera: "M4 8h3l2-3h6l2 3h3v11H4zm8 8.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7",
+  flag: "M5 21V4m0 0h11l-2 4 2 4H5",
 } as const;
 
 export type IconName = keyof typeof PATHS;

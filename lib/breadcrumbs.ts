@@ -16,6 +16,7 @@ const SECTIONS: Record<string, Section> = {
   people: { label: "People", href: "/people", group: "Admin" },
   notifications: { label: "Notifications", href: "/notifications" },
   search: { label: "Search", href: "/search" },
+  help: { label: "Help & guide", href: "/help" },
 };
 /** Pages named after their own path segment. */
 const PAGES: Record<string, string> = { history: "Completed", checklists: "Checklists", locations: "Locations", calendar: "Calendar", import: "Import", digest: "Daily email" };
@@ -25,7 +26,9 @@ export function crumbs(pathname: string, role: Role): { label: string; href?: st
   if (seg.length === 0) return role === "REQUESTER" ? [{ label: "Home" }] : [{ label: "Overview" }, { label: "Dashboard" }];
   const sec = SECTIONS[seg[0]];
   if (!sec) return [];
-  if (role === "REQUESTER") return [{ label: "My requests", href: "/requests" }, ...(seg.length > 1 ? [{ label: seg[1] === "new" ? "Report a problem" : "Request" }] : [])];
+  if (role === "REQUESTER" && seg[0] === "requests") {
+    return [{ label: "My requests", href: "/requests" }, ...(seg.length > 1 ? [{ label: seg[1] === "new" ? "Report a problem" : "Request" }] : [])];
+  }
   if (seg.length === 1) {
     const own = PAGES[seg[0]];
     return own ? [{ label: sec.label, href: sec.href }, { label: own }] : [...(sec.group ? [{ label: sec.group }] : []), { label: sec.label }];

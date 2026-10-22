@@ -26,7 +26,7 @@ export default async function PmSchedulesPage() {
       </p>
       <Card>
         {rows.length === 0 ? (
-          <Empty>No PM schedules yet.</Empty>
+          <Empty>No PM schedules yet. Open a machine on the Equipment page and add one on its PM schedules tab.</Empty>
         ) : (
           <div className="overflow-x-auto">
             <table className="table">

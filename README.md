@@ -26,12 +26,14 @@ computer (`npm run local`) or hosted on Vercel.
 | **Dashboard** | Tiles for overdue, due this week, assigned to you and completed in 30 days (vs the 30 days before); a weekly chart of work opened vs completed (or the open backlog) with a hover readout and a table view; open work by equipment; downtime by equipment (30 days); PM compliance (90 days); and what needs attention, requests to review and low stock. |
 | **Activity panel** | On wide screens, a right-hand panel with your latest notifications, what the team did lately (work completed and opened, problems reported, equipment marked down) and the team. Hide or show it with the panel button in the top bar. |
 | **Search** | One box for work orders, equipment, parts and requests — by name, description, asset tag, serial or part number, or a number like WO-0012. |
+| **Onboarding** | On their first visit, people get a short welcome for their role — how work flows from PM schedules and requests to completed work, how to read the screen, how to do the main job — then a guided tour that points at the real screen. It comes back when someone's role changes (a requester made a technician gets the technician's tour). The dashboard has a getting-started card: an admin's **setup checklist** that ticks itself off (locations, equipment, PM schedules, team, parts, a first completed work order), *how to do a work order* for technicians, *how reporting works* for requesters. Admins are told when someone new signs in, and People marks them **New**. |
+| **Help & guide** | The **?** in the top bar: how everything works, written for your role, with **Take the tour** to replay the tour. |
 | **Locations** | A tree (plant → area → line). Each location shows the equipment in it and below it, and its open work orders. Existing free-text locations were converted automatically. |
 | **Equipment tree** | Assets can sit under a parent (a dryer under its compressor). The asset list shows the tree, filters by location (including sub-locations) and by "down now". |
 | **Asset page** | Tabs: Overview (details, meter, sub-assets, open work) · Work orders · PM schedules · Downtime · Meter readings. |
 | **Downtime** | Mark an asset down / back up, tick "asset is down" on a new repair or request, and mark it back up when completing the work order. Totals for 7 / 30 / 90 days and a downtime log. Down assets show on the dashboard. |
 | **Requests** | Anyone can **Report a problem** (what's wrong, which equipment, how urgent, is it down). A reviewer approves it into a work order or rejects it with a reason. |
-| **Roles** | **Admin** (set-up, reviewing requests, people), **Technician** (does and records the work), **Requester** (reports problems, follows their own requests). The first person to sign in becomes admin; new people start as requesters. Manage roles on the **People** page. |
+| **Roles** | **Admin** (set-up, reviewing requests, people), **Technician** (does and records the work), **Requester** (reports problems, follows their own requests). The first person to sign in becomes admin; new people start as requesters, and admins are told they've joined. Manage roles on the **People** page. |
 | **Parts & stock** | Parts list with on-hand quantity, low-stock level, cost and bin location. Restock and count corrections, a full stock history, low-stock badges and a dashboard card. Parts used on a work order come out of stock (and go back if removed). |
 | **Labor time** | Start / stop timer on a work order (several people can be on the clock), or log time afterwards. Totals on the work order and in reports. |
 | **Photos & files** | Attach photos and PDFs to work orders and assets (manuals, nameplates). Phone photos are shrunk before uploading. |
@@ -175,6 +177,7 @@ app/
     checklists/           checklist templates
     notifications/        the bell's list ([id] opens one and marks it read)
     search/               one search across work orders, equipment, parts and requests
+    help/                 the Help & guide page (role-aware; replays the tour)
     assets/import, parts/import   CSV import with preview
   a/[id]                  where QR labels point (asset for staff, report a problem for others)
   print/                  printable work orders, asset history, QR labels
@@ -189,6 +192,7 @@ lib/notify.ts             in-app notifications
 lib/actions.ts            server actions (all writes)
 lib/queries.ts            shared reads (open work orders, PM schedules, users, the activity panel)
 components/app-shell.tsx  sidebar, top bar and activity panel around every page
+components/onboarding.tsx the welcome slides and the guided tour (lib/onboarding.ts: who sees what, setup steps)
 lib/forms.ts              zod validation + formatting helpers
 prisma/schema.prisma      data model
 lib/sample-data.ts        sample equipment ("Load sample equipment" / npm run db:seed)

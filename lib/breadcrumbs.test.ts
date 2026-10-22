@@ -17,6 +17,7 @@ it("names sections by their group, and pages by their section", () => {
   expect(trail("/requests/new")).toBe("Requests / Report a problem");
   expect(trail("/people/digest")).toBe("People / Daily email");
   expect(trail("/search")).toBe("Search");
+  expect(trail("/help")).toBe("Help & guide");
   expect(trail("/nowhere")).toBe("");
 });
 
@@ -24,6 +25,8 @@ it("keeps requesters to their own pages", () => {
   expect(trail("/", "REQUESTER")).toBe("Home");
   expect(trail("/requests", "REQUESTER")).toBe("My requests");
   expect(trail("/requests/new", "REQUESTER")).toBe("My requests / Report a problem");
+  expect(trail("/help", "REQUESTER")).toBe("Help & guide");
+  expect(trail("/notifications", "REQUESTER")).toBe("Notifications");
   expect(crumbs("/work-orders", "ADMIN")[1].href).toBeUndefined();
   expect(crumbs("/work-orders/x", "ADMIN")[0].href).toBe("/work-orders");
 });

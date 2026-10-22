@@ -74,7 +74,13 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: P
         {open ? (
           <OpenWorkOrderList
             rows={rows as Awaited<ReturnType<typeof loadOpenWorkOrders>>}
-            empty={filtered ? "No work orders match these filters." : f.view === "mine" ? "Nothing assigned to you." : "No open work orders."}
+            empty={
+              filtered
+                ? "No work orders match these filters."
+                : f.view === "mine"
+                  ? "Nothing assigned to you right now."
+                  : "No open work orders. They appear here when a PM schedule comes due, when a request is approved, or when someone makes one with + New."
+            }
           />
         ) : (
           <CompletedWorkOrderTable rows={rows} />

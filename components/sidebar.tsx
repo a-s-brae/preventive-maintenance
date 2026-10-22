@@ -141,74 +141,76 @@ export function Sidebar({
 
       <nav className="flex-1 space-y-5 overflow-y-auto px-4 pb-4" aria-label="Main">
         {role !== "REQUESTER" && <QuickLinks favorites={favorites} recent={recent} />}
-        {groups.map((group) => (
-          <div key={group.title}>
-            <div className="mb-1 px-2 text-sm text-neutral-500">{group.title}</div>
-            <ul className="space-y-0.5">
-              {group.items.map((item) => {
-                const here = inSection(item, pathname);
-                const open = !!item.children && expanded.has(item.href);
-                const childHere = here && item.children?.some((c) => c.active(pathname, view));
-                return (
-                  <li key={item.href}>
-                    <div className={`flex items-center rounded-lg ${here && !childHere ? "bg-neutral-100" : "hover:bg-neutral-50"}`}>
-                      {item.children ? (
-                        <button
-                          type="button"
-                          onClick={() => toggle(item.href)}
-                          aria-expanded={open}
-                          aria-label={`${open ? "Hide" : "Show"} ${item.label} pages`}
-                          className="flex h-8 w-6 shrink-0 items-center justify-center rounded-l-lg text-neutral-400 hover:text-ink"
-                        >
-                          <Icon name="chevronRight" className={`size-3.5 transition-transform ${open ? "rotate-90" : ""}`} />
-                        </button>
-                      ) : (
-                        <span className="w-6 shrink-0" />
-                      )}
-                      <Link
-                        href={item.href}
-                        aria-current={here && !childHere ? "page" : undefined}
-                        onClick={() => item.children && !open && toggle(item.href)}
-                        className={`flex min-w-0 flex-1 items-center gap-2 py-1.5 pr-2 text-sm text-ink ${here ? "font-medium" : ""}`}
-                      >
-                        <Icon name={item.icon} />
-                        <span className="flex-1 truncate">{item.label}</span>
-                        {item.badge && item.badge.count > 0 && (
-                          <span
-                            title={`${item.badge.count} ${item.badge.title}`}
-                            className={`min-w-5 rounded-md px-1.5 text-center text-xs leading-5 font-medium ${
-                              item.badge.tone === "red" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-800"
-                            }`}
+        <div className="space-y-5" data-tour="nav">
+          {groups.map((group) => (
+            <div key={group.title}>
+              <div className="mb-1 px-2 text-sm text-neutral-500">{group.title}</div>
+              <ul className="space-y-0.5">
+                {group.items.map((item) => {
+                  const here = inSection(item, pathname);
+                  const open = !!item.children && expanded.has(item.href);
+                  const childHere = here && item.children?.some((c) => c.active(pathname, view));
+                  return (
+                    <li key={item.href}>
+                      <div className={`flex items-center rounded-lg ${here && !childHere ? "bg-neutral-100" : "hover:bg-neutral-50"}`}>
+                        {item.children ? (
+                          <button
+                            type="button"
+                            onClick={() => toggle(item.href)}
+                            aria-expanded={open}
+                            aria-label={`${open ? "Hide" : "Show"} ${item.label} pages`}
+                            className="flex h-8 w-6 shrink-0 items-center justify-center rounded-l-lg text-neutral-400 hover:text-ink"
                           >
-                            {item.badge.count}
-                          </span>
+                            <Icon name="chevronRight" className={`size-3.5 transition-transform ${open ? "rotate-90" : ""}`} />
+                          </button>
+                        ) : (
+                          <span className="w-6 shrink-0" />
                         )}
-                      </Link>
-                    </div>
-                    {open && (
-                      <ul className="mt-0.5 space-y-0.5">
-                        {item.children!.map((c) => {
-                          const active = here && c.active(pathname, view);
-                          return (
-                            <li key={c.label}>
-                              <Link
-                                href={c.href}
-                                aria-current={active ? "page" : undefined}
-                                className={`block rounded-lg py-1.5 pr-2 pl-[3.25rem] text-sm text-ink ${active ? "bg-neutral-100" : "hover:bg-neutral-50"}`}
-                              >
-                                {c.label}
-                              </Link>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+                        <Link
+                          href={item.href}
+                          aria-current={here && !childHere ? "page" : undefined}
+                          onClick={() => item.children && !open && toggle(item.href)}
+                          className={`flex min-w-0 flex-1 items-center gap-2 py-1.5 pr-2 text-sm text-ink ${here ? "font-medium" : ""}`}
+                        >
+                          <Icon name={item.icon} />
+                          <span className="flex-1 truncate">{item.label}</span>
+                          {item.badge && item.badge.count > 0 && (
+                            <span
+                              title={`${item.badge.count} ${item.badge.title}`}
+                              className={`min-w-5 rounded-md px-1.5 text-center text-xs leading-5 font-medium ${
+                                item.badge.tone === "red" ? "bg-red-50 text-red-700" : "bg-amber-50 text-amber-800"
+                              }`}
+                            >
+                              {item.badge.count}
+                            </span>
+                          )}
+                        </Link>
+                      </div>
+                      {open && (
+                        <ul className="mt-0.5 space-y-0.5">
+                          {item.children!.map((c) => {
+                            const active = here && c.active(pathname, view);
+                            return (
+                              <li key={c.label}>
+                                <Link
+                                  href={c.href}
+                                  aria-current={active ? "page" : undefined}
+                                  className={`block rounded-lg py-1.5 pr-2 pl-[3.25rem] text-sm text-ink ${active ? "bg-neutral-100" : "hover:bg-neutral-50"}`}
+                                >
+                                  {c.label}
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
+        </div>
       </nav>
 
       <div className="flex items-center gap-2 border-t border-neutral-200/70 px-5 py-4">
@@ -236,7 +238,7 @@ function QuickLinks({ favorites, recent }: { favorites: PageLink[]; recent: Page
   const [tab, setTab] = useState<"favorites" | "recent">("favorites");
   const list = tab === "favorites" ? favorites : recent;
   return (
-    <div>
+    <div data-tour="quick">
       <div className="mb-1 flex gap-4 px-2 text-sm" role="tablist" aria-label="Quick links">
         {(["favorites", "recent"] as const).map((t) => (
           <button

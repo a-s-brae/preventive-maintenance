@@ -728,6 +728,22 @@ export async function updatePerson(userId: string, _prev: FormState, fd: FormDat
   return {};
 }
 
+// ─── Onboarding ─────────────────────────────────────────────────────────────
+
+/** The welcome and tour are done (or skipped) for the role this person has now. */
+export async function finishWelcome() {
+  const user = await requireUser();
+  await db.user.update({ where: { id: user.id }, data: { welcomedAs: user.role } });
+  revalidatePath("/", "layout");
+}
+
+/** Hide the dashboard's getting-started card, or bring it back. */
+export async function setGuideHidden(hidden: boolean) {
+  const user = await requireUser();
+  await db.user.update({ where: { id: user.id }, data: { guideHiddenAs: hidden ? user.role : null } });
+  revalidatePath("/", "layout");
+}
+
 /** Send everyone's daily email now (normally it goes out each weekday morning). */
 export async function sendDigestNow() {
   await requirePermission("people");

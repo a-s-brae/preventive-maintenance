@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { finishWelcome } from "@/lib/actions";
 import { crumbs } from "@/lib/breadcrumbs";
 import { Icon } from "./icons";
+import { Tour, tourSteps, Welcome } from "./onboarding";
 import { Sidebar, type Counts, type PageLink, type Role } from "./sidebar";
 
 const DEFAULT_FAVORITES: PageLink[] = [
@@ -56,6 +58,7 @@ export function AppShell({
   rail,
   initialSidebar,
   initialRail,
+  welcome,
   children,
 }: {
   user: { id: string; name: string; email: string };
@@ -68,6 +71,8 @@ export function AppShell({
   initialSidebar: boolean;
   /** "auto": shown on wide screens only. */
   initialRail: "auto" | "open" | "closed";
+  /** They haven't had the welcome (and tour) for their role yet. */
+  welcome: boolean;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -95,6 +100,31 @@ export function AppShell({
     setFavorites(readList("pm-favorites") ?? DEFAULT_FAVORITES);
     setRecent(readList("pm-recent") ?? []);
   }, []);
+
+  // Onboarding: the welcome opens on the dashboard (never in the middle of a
+  // task someone came to do), then the tour. /?tour=1 replays the tour.
+  const router = useRouter();
+  const [welcomed, setWelcomed] = useState(!welcome);
+  const [welcomeOpen, setWelcomeOpen] = useState(false);
+  const [touring, setTouring] = useState(false);
+  // A new role while the app is open (say, just made a technician): welcome them again.
+  useEffect(() => {
+    if (welcome) setWelcomed(false);
+  }, [welcome]);
+  useEffect(() => {
+    if (!welcomed && pathname === "/") setWelcomeOpen(true);
+  }, [welcomed, pathname]);
+  useEffect(() => {
+    if (pathname === "/" && params.get("tour") === "1") {
+      setTouring(true);
+      router.replace("/", { scroll: false });
+    }
+  }, [pathname, params, router]);
+  const done = () => {
+    if (welcomed) return;
+    setWelcomed(true);
+    void finishWelcome();
+  };
 
   // Close the phone menu after navigating, and on Esc.
   useEffect(() => setDrawer(false), [pathname, search]);
@@ -157,7 +187,7 @@ export function AppShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-1 border-b border-neutral-200/70 bg-white/95 px-3 backdrop-blur sm:gap-2 sm:px-6 lg:px-7 print:hidden">
-          <button type="button" onClick={() => setDrawer(true)} aria-label="Open menu" aria-expanded={drawer} className="btn-ghost lg:hidden">
+          <button type="button" onClick={() => setDrawer(true)} aria-label="Open menu" aria-expanded={drawer} className="btn-ghost lg:hidden" data-tour="menu">
             <Icon name="panelLeft" />
           </button>
           <button
@@ -191,10 +221,13 @@ export function AppShell({
             {staff ? (
               <NewMenu admin={role === "ADMIN"} />
             ) : (
-              <Link href="/requests/new" className="btn-primary h-8 px-3">
+              <Link href="/requests/new" className="btn-primary h-8 px-3" data-tour="report">
                 Report a problem
               </Link>
             )}
+            <Link href="/help" aria-label="Help and guide" title="Help and guide" className="btn-ghost" data-tour="help">
+              <Icon name="help" />
+            </Link>
             <Bell count={counts.unread} />
             {rail && (
               <button
@@ -223,10 +256,32 @@ export function AppShell({
       {rail && railMode !== "closed" && (
         <aside
           aria-label="Notifications and activity"
+          data-tour="activity"
           className={`sticky top-0 hidden h-screen w-[280px] shrink-0 overflow-y-auto border-l border-neutral-200/70 bg-white print:hidden ${railMode === "open" ? "xl:block" : RAIL_AUTO}`}
         >
           {rail}
         </aside>
+      )}
+
+      {welcomeOpen && (
+        <Welcome
+          role={role}
+          user={user}
+          onDone={(tour) => {
+            setWelcomeOpen(false);
+            if (tour) setTouring(true);
+            else done();
+          }}
+        />
+      )}
+      {touring && (
+        <Tour
+          steps={tourSteps(role)}
+          onClose={() => {
+            setTouring(false);
+            done();
+          }}
+        />
       )}
 
       {drawer && (
@@ -296,7 +351,7 @@ function SearchBox() {
   }, [router]);
   return (
     <>
-      <form action="/search" role="search" className="relative hidden md:block">
+      <form action="/search" role="search" className="relative hidden md:block" data-tour="search">
         <Icon name="search" className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-neutral-400" />
         <input
           ref={input}
@@ -308,7 +363,7 @@ function SearchBox() {
         />
         <kbd className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 font-sans text-xs text-neutral-400">{mac ? "⌘K" : "Ctrl K"}</kbd>
       </form>
-      <Link href="/search" aria-label="Search" className="btn-ghost md:hidden">
+      <Link href="/search" aria-label="Search" className="btn-ghost md:hidden" data-tour="search">
         <Icon name="search" />
       </Link>
     </>
@@ -341,7 +396,7 @@ function NewMenu({ admin }: { admin: boolean }) {
       : []),
   ];
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative" data-tour="new">
       <button type="button" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} aria-label="New" className="btn-primary h-8 gap-1 px-2 sm:px-3">
         <Icon name="plus" className="size-4" />
         <span className="hidden sm:inline">New</span>
@@ -362,7 +417,7 @@ function NewMenu({ admin }: { admin: boolean }) {
 /** Link to the notifications page, with the unread count. */
 function Bell({ count }: { count: number }) {
   return (
-    <Link href="/notifications" aria-label={count ? `Notifications, ${count} unread` : "Notifications"} title="Notifications" className="btn-ghost">
+    <Link href="/notifications" aria-label={count ? `Notifications, ${count} unread` : "Notifications"} title="Notifications" className="btn-ghost" data-tour="bell">
       <Icon name="bell" />
       {count > 0 && (
         <span className="absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-red-500 px-1 text-center text-[10px] leading-4 font-semibold text-white">

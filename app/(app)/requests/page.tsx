@@ -47,7 +47,13 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
       />
       <Card>
         {requests.length === 0 ? (
-          <Empty>{view.key === "pending" ? "Nothing waiting for review." : "No requests here."}</Empty>
+          <Empty>
+            {view.key !== "pending"
+              ? "No requests here."
+              : can(user.role, "review")
+                ? "Nothing waiting for review. When someone reports a problem, it shows up here to approve or turn down."
+                : "Nothing waiting for review."}
+          </Empty>
         ) : (
           <div className="overflow-x-auto">
             <table className="table">

@@ -29,7 +29,7 @@ export default async function LocationsPage() {
         {can(me.role, "manage") && <ButtonLink href="/locations/new">+ Location</ButtonLink>}
       </PageHeader>
       <EquipmentTabs active="locations" />
-      <p className="mb-4 text-sm text-slate-600">
+      <p className="mb-4 text-sm text-neutral-600">
         Where equipment is, e.g. <em>Main plant › Molding › Line 3</em>. Counts include everything inside a location.
       </p>
       <Card>
@@ -53,7 +53,7 @@ export default async function LocationsPage() {
                     <tr key={l.id}>
                       <td>
                         <div className="flex items-center" style={{ paddingLeft: `${l.depth * 1.25}rem` }}>
-                          {l.depth > 0 && <span className="mr-1.5 text-slate-400">└</span>}
+                          {l.depth > 0 && <span className="mr-1.5 text-neutral-400">└</span>}
                           <Link href={`/locations/${l.id}`} className={`link ${l.depth === 0 ? "font-semibold" : ""}`}>
                             {l.name}
                           </Link>
@@ -68,7 +68,7 @@ export default async function LocationsPage() {
                           "—"
                         )}
                       </td>
-                      <td>{t.down ? <span className="font-medium text-red-700">{t.down} down</span> : <span className="text-slate-400">—</span>}</td>
+                      <td>{t.down ? <span className="font-medium text-red-700">{t.down} down</span> : <span className="text-neutral-400">—</span>}</td>
                       <td className="text-right">
                         {can(me.role, "manage") && (
                           <Link href={`/locations/new?parentId=${l.id}`} className="link text-xs whitespace-nowrap">
@@ -84,7 +84,7 @@ export default async function LocationsPage() {
           </div>
         )}
         {unplaced > 0 && (
-          <p className="mt-3 text-xs text-slate-500">
+          <p className="mt-3 text-xs text-neutral-500">
             {unplaced} asset{unplaced === 1 ? " has" : "s have"} no location yet — edit {unplaced === 1 ? "it" : "them"} to place {unplaced === 1 ? "it" : "them"}.
           </p>
         )}

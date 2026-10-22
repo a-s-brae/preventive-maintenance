@@ -20,9 +20,9 @@ export default async function DigestPreviewPage() {
           <Card key={d.email} title={`${d.email} — ${d.msg ? d.msg.subject : "nothing to send"}`}>
             {d.msg ? (
               // The digest HTML is built from escaped values in lib/digest.ts.
-              <div className="prose prose-sm max-w-none text-sm [&_a]:text-sky-700 [&_li]:ml-5 [&_li]:list-disc [&_p]:my-2" dangerouslySetInnerHTML={{ __html: d.msg.html }} />
+              <div className="prose prose-sm max-w-none text-sm [&_a]:text-accent-700 [&_li]:ml-5 [&_li]:list-disc [&_p]:my-2" dangerouslySetInnerHTML={{ __html: d.msg.html }} />
             ) : (
-              <p className="text-sm text-slate-500">Nothing overdue or due soon — no email today.</p>
+              <p className="text-sm text-neutral-500">Nothing overdue or due soon — no email today.</p>
             )}
           </Card>
         ))}

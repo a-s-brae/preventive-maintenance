@@ -22,7 +22,7 @@ export function WorkOrderParts({
   return (
     <div className="space-y-3">
       {usages.length === 0 ? (
-        !canEdit && <p className="text-sm text-slate-500">None.</p>
+        !canEdit && <p className="text-sm text-neutral-500">None.</p>
       ) : (
         <div className="overflow-x-auto">
           <table className="table">
@@ -42,14 +42,14 @@ export function WorkOrderParts({
                     <Link href={`/parts/${u.part.id}`} className="link">
                       {u.part.name}
                     </Link>
-                    <div className="text-xs text-slate-500">
+                    <div className="text-xs text-neutral-500">
                       {[u.part.partNumber, userLabel(u.usedBy)].filter(Boolean).join(" · ")}
                     </div>
                   </td>
                   <td className="tabular-nums">
                     {formatQty(u.quantity)} {u.part.unit}
                   </td>
-                  <td className="tabular-nums text-slate-600">{formatMoney(u.unitCost)}</td>
+                  <td className="tabular-nums text-neutral-600">{formatMoney(u.unitCost)}</td>
                   <td className="tabular-nums">{u.unitCost == null ? "—" : formatMoney(u.quantity * u.unitCost)}</td>
                   <td className="text-right">
                     {canEdit && (
@@ -63,7 +63,7 @@ export function WorkOrderParts({
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={3} className="text-right text-xs font-medium tracking-wide text-slate-500 uppercase">
+                <td colSpan={3} className="text-right text-xs font-medium tracking-wide text-neutral-500 uppercase">
                   Parts total
                 </td>
                 <td className="font-medium tabular-nums">{formatMoney(partsCost(usages))}</td>

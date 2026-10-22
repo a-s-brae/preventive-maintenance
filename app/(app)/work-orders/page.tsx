@@ -49,15 +49,15 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: P
         )}
         {chip("High priority", { priority: f.priority === "HIGH" ? undefined : "HIGH" }, f.priority === "HIGH")}
         <details className="text-sm" open={moreActive}>
-          <summary className="cursor-pointer rounded-md px-2 py-1 text-sky-700 select-none hover:bg-sky-50">More filters</summary>
-          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-lg bg-white p-2 ring-1 ring-slate-200">
-            <span className="text-xs text-slate-500">Type</span>
+          <summary className="cursor-pointer rounded-lg px-2 py-1 text-neutral-600 select-none hover:bg-neutral-100 hover:text-ink">More filters</summary>
+          <div className="mt-2 flex flex-wrap items-center gap-2 rounded-xl bg-surface p-3">
+            <span className="text-xs text-neutral-500">Type</span>
             {(["PM", "REPAIR", "INSPECTION"] as const).map((t) => chip(TYPE_LABEL[t], { type: f.type === t ? undefined : t }, f.type === t))}
-            <span className="ml-2 text-xs text-slate-500">Priority</span>
+            <span className="ml-2 text-xs text-neutral-500">Priority</span>
             {PRIORITY_FILTERS.filter((p) => p !== "HIGH").map((p) => chip(PRIORITY_LABEL[p], { priority: f.priority === p ? undefined : p }, f.priority === p))}
             {open && (
               <>
-                <span className="ml-2 text-xs text-slate-500">Status</span>
+                <span className="ml-2 text-xs text-neutral-500">Status</span>
                 {chip("Not started", { status: f.status === "OPEN" ? undefined : "OPEN" }, f.status === "OPEN")}
               </>
             )}
@@ -79,7 +79,7 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: P
         ) : (
           <CompletedWorkOrderTable rows={rows} />
         )}
-        <p className="mt-3 text-xs text-slate-500">
+        <p className="mt-3 text-xs text-neutral-500">
           {rows.length} work order{rows.length === 1 ? "" : "s"}
           {!open && rows.length === 200 && (
             <>
@@ -100,11 +100,7 @@ export default async function WorkOrdersPage({ searchParams }: { searchParams: P
 /** A filter you switch on and off. */
 function Chip({ href, active, children }: { href: string; active: boolean; children: React.ReactNode }) {
   return (
-    <Link
-      href={href}
-      aria-pressed={active}
-      className={`rounded-full px-3 py-1 text-sm ring-1 ring-inset ${active ? "bg-sky-700 text-white ring-sky-700" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}
-    >
+    <Link href={href} aria-pressed={active} className="chip">
       {children}
     </Link>
   );

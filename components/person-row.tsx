@@ -20,7 +20,7 @@ export function PersonRow({
     <ActionForm action={action} className="grid items-center gap-2 py-3 sm:grid-cols-[1.4fr_1fr_auto_auto_auto] sm:gap-4">
       <div className="min-w-0">
         <input name="name" defaultValue={person.name ?? ""} placeholder="Name" aria-label={`Name for ${person.email}`} className="input py-1.5" />
-        <div className="mt-0.5 truncate text-xs text-slate-500">
+        <div className="mt-0.5 truncate text-xs text-neutral-500">
           {person.email}
           {isMe && " (you)"}
         </div>

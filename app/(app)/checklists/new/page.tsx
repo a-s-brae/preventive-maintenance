@@ -22,7 +22,7 @@ export default async function NewTemplatePage({ searchParams }: { searchParams: 
       <PageHeader title="New checklist template" />
       {pms.length > 0 && (
         <form className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-          <label htmlFor="from" className="text-slate-600">
+          <label htmlFor="from" className="text-neutral-600">
             Start from a PM’s checklist:
           </label>
           <select id="from" name="from" defaultValue={source?.id ?? ""} className="input w-auto max-w-full py-1.5">

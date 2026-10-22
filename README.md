@@ -22,7 +22,10 @@ computer (`npm run local`) or hosted on Vercel.
 | **Meter readings** | Log a reading any time (or when completing a work order). Readings can't go backwards. |
 | **Checklist autosave** | Each answer (and its optional note) is saved the moment it's entered, so a PM interrupted halfway keeps its answers. The first answer moves the work order to In progress. |
 | **Lists** | Filter chips for due / status / priority, search, and **Export to Excel (CSV) under More** on work orders, PM schedules and assets (the export matches the filters on screen). |
-| **Navigation** | A short sidebar (Dashboard, Work orders, Requests, Equipment, Parts, PM schedules, Reports, and People for admins) with badges for what needs attention. Related pages are tabs inside each section (e.g. Work orders: Open · Assigned to me · Calendar · Completed). **+ New** creates a work order, request, asset or part from anywhere. Each page has one main button; exports, imports and printing are under **More**. Full screen width; a slide-out menu on phones. |
+| **Navigation** | A light sidebar in groups — Overview (Dashboard, Reports), Maintenance (Work orders, Requests, PM schedules, Equipment, Parts), Admin (People) — with badges for what needs attention; sections with sub-pages open out (e.g. Work orders: Open · Assigned to me · Calendar · Completed), and the same pages are tabs on the page. **Favorites** (star any page, filters included) and **Recently** (the records you opened) sit at the top. The top bar has a breadcrumb, **search** (⌘K / Ctrl K), **+ New** (work order, request, asset or part) and the bell. Each page has one main button; exports, imports and printing are under **More**. The sidebar can be hidden for more room; a slide-out menu on phones. |
+| **Dashboard** | Tiles for overdue, due this week, assigned to you and completed in 30 days (vs the 30 days before); a weekly chart of work opened vs completed (or the open backlog) with a hover readout and a table view; open work by equipment; downtime by equipment (30 days); PM compliance (90 days); and what needs attention, requests to review and low stock. |
+| **Activity panel** | On wide screens, a right-hand panel with your latest notifications, what the team did lately (work completed and opened, problems reported, equipment marked down) and the team. Hide or show it with the panel button in the top bar. |
+| **Search** | One box for work orders, equipment, parts and requests — by name, description, asset tag, serial or part number, or a number like WO-0012. |
 | **Locations** | A tree (plant → area → line). Each location shows the equipment in it and below it, and its open work orders. Existing free-text locations were converted automatically. |
 | **Equipment tree** | Assets can sit under a parent (a dryer under its compressor). The asset list shows the tree, filters by location (including sub-locations) and by "down now". |
 | **Asset page** | Tabs: Overview (details, meter, sub-assets, open work) · Work orders · PM schedules · Downtime · Meter readings. |
@@ -33,9 +36,9 @@ computer (`npm run local`) or hosted on Vercel.
 | **Labor time** | Start / stop timer on a work order (several people can be on the clock), or log time afterwards. Totals on the work order and in reports. |
 | **Photos & files** | Attach photos and PDFs to work orders and assets (manuals, nameplates). Phone photos are shrunk before uploading. |
 | **Printable records** | A printable work order record (checklist, parts, time, photos, sign-off lines) and an asset's maintenance history for any date range — print or save as PDF for audits. |
-| **Checklist templates** | Write a checklist once (e.g. *Forklift pre-shift inspection*) and pick it on any number of PM schedules. Changing the template updates every PM that follows it, and their work orders that haven't been started. Start a template from scratch or from an existing PM's checklist. Admin › Planning › **Checklists**. |
+| **Checklist templates** | Write a checklist once (e.g. *Forklift pre-shift inspection*) and pick it on any number of PM schedules. Changing the template updates every PM that follows it, and their work orders that haven't been started. Start a template from scratch or from an existing PM's checklist. PM schedules › **Checklists** (admins). |
 | **CSV import** | Bulk-load or bulk-edit **assets** and **parts** from Excel: export, edit, import. A preview shows what each row will do (new / update / skipped with the reason) before anything changes. Assets match by tag, parts by part number; missing locations are created; parents can be in the same file. |
-| **Notifications** | A bell (top of the sidebar, or the top bar on phones) with an unread count. You're told when a work order is assigned to you or a PM work order is created for you, when your request is approved, rejected or done, and — for admins — about new requests, follow-up repairs and parts going low or out of stock. |
+| **Notifications** | A bell in the top bar with an unread count (the latest also show in the activity panel). You're told when a work order is assigned to you or a PM work order is created for you, when your request is approved, rejected or done, and — for admins — about new requests, follow-up repairs and parts going low or out of stock. |
 | **Reports** | Pick a date range (30 / 90 days, 12 months, this year, or custom). KPIs: **PM compliance** (done by the due date), work orders done / open / overdue, **downtime**, **MTTR / MTBF**, and **maintenance cost** (parts, plus labor at an hourly rate you enter). Charts of work done by type, compliance over time, downtime and cost by asset, and a per-asset table with CSV export. |
 | **QR labels** | Print 2″ × 4″ labels (Avery 5163) for one asset, a location or all equipment. Scanning opens the asset for staff, and **Report a problem** with the asset filled in for everyone else (after sign-in if needed). |
 | **Daily email** | Each weekday morning, techs and admins get their overdue / due-soon work orders, and admins a plant summary. Needs email set up (hosted only); preview it on the People page. |
@@ -162,7 +165,7 @@ the new folder in `prisma/migrations/`.
 app/
   login/                  magic-link sign-in + "check your email"
   (app)/                  everything behind sign-in
-    page.tsx              dashboard: overdue / due this week / assigned to me
+    page.tsx              dashboard: KPI tiles, trend and equipment charts, what needs attention
     work-orders/          list, new, [id] detail + complete, [id]/edit, calendar
     pm/                   all PM schedules
     assets/               list, new, [id] detail, edit, add PM schedule
@@ -171,6 +174,7 @@ app/
     reports/              KPIs, charts and per-asset table (+ CSV export)
     checklists/           checklist templates
     notifications/        the bell's list ([id] opens one and marks it read)
+    search/               one search across work orders, equipment, parts and requests
     assets/import, parts/import   CSV import with preview
   a/[id]                  where QR labels point (asset for staff, report a problem for others)
   print/                  printable work orders, asset history, QR labels
@@ -183,7 +187,8 @@ lib/reports.ts            PM compliance, MTTR / MTBF, date ranges (pure, tested)
 lib/csv-import.ts         CSV parsing and import planning (pure, tested); import-run.ts applies it
 lib/notify.ts             in-app notifications
 lib/actions.ts            server actions (all writes)
-lib/queries.ts            shared reads (open work orders, PM schedules, users)
+lib/queries.ts            shared reads (open work orders, PM schedules, users, the activity panel)
+components/app-shell.tsx  sidebar, top bar and activity panel around every page
 lib/forms.ts              zod validation + formatting helpers
 prisma/schema.prisma      data model
 lib/sample-data.ts        sample equipment ("Load sample equipment" / npm run db:seed)

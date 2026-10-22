@@ -38,7 +38,7 @@ export function AssetForm({
             <option value="">— No location —</option>
             <TreeOptions options={locations} />
           </select>
-          <Link href="/locations" className="mt-1 inline-block text-xs text-sky-700 hover:underline">
+          <Link href="/locations" className="mt-1 inline-block text-xs text-accent-700 hover:underline">
             Manage locations
           </Link>
         </Field>

@@ -33,9 +33,9 @@ export default async function LocationPage({ params }: { params: Promise<{ id: s
     <>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          {node.path.length > 0 && <div className="text-sm text-slate-500">{node.path.join(" › ")}</div>}
-          <h1 className="text-2xl font-semibold tracking-tight">{node.name}</h1>
-          {location?.notes && <p className="mt-1 max-w-2xl text-sm whitespace-pre-wrap text-slate-600">{location.notes}</p>}
+          {node.path.length > 0 && <div className="text-sm text-neutral-500">{node.path.join(" › ")}</div>}
+          <h1 className="text-xl font-semibold">{node.name}</h1>
+          {location?.notes && <p className="mt-1 max-w-2xl text-sm whitespace-pre-wrap text-neutral-600">{location.notes}</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <MoreMenu
@@ -53,20 +53,20 @@ export default async function LocationPage({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+      <div className="grid gap-6 @4xl:grid-cols-3">
+        <div className="space-y-6 @4xl:col-span-2">
           <Card title={`Equipment (${assets.length})`}>
             {assets.length === 0 ? (
               <Empty>No equipment here yet.</Empty>
             ) : (
-              <ul className="divide-y divide-slate-100 text-sm">
+              <ul className="divide-y divide-neutral-100 text-sm">
                 {assets.map((a) => (
                   <li key={a.id} className="flex items-center justify-between gap-3 py-2">
                     <div>
                       <Link href={`/assets/${a.id}`} className="link">
                         {a.name}
                       </Link>
-                      {a.locationId !== id && <div className="text-xs text-slate-500">{pathLabel(tree.find((l) => l.id === a.locationId))}</div>}
+                      {a.locationId !== id && <div className="text-xs text-neutral-500">{pathLabel(tree.find((l) => l.id === a.locationId))}</div>}
                     </div>
                     {a.downtimes.length ? <DownBadge /> : <span className="text-xs text-emerald-700">Running</span>}
                   </li>

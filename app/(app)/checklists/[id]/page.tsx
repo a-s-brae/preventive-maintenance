@@ -29,9 +29,9 @@ export default async function TemplatePage({ params, searchParams }: { params: P
           Delete
         </ConfirmButton>
       </PageHeader>
-      {saved && <p className="mb-4 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-emerald-200">Template saved.</p>}
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+      {saved && <p className="mb-4 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 ring-1 ring-emerald-200">Template saved.</p>}
+      <div className="grid gap-6 @4xl:grid-cols-3">
+        <div className="@4xl:col-span-2">
           <Card>
             <TemplateForm
               key={template.updatedAt.toISOString()}
@@ -45,7 +45,7 @@ export default async function TemplatePage({ params, searchParams }: { params: P
         </div>
         <Card title="Used by">
           {template.tasks.length === 0 ? (
-            <p className="text-sm text-slate-500">No PM schedules yet. Pick this template in a PM schedule’s checklist section.</p>
+            <p className="text-sm text-neutral-500">No PM schedules yet. Pick this template in a PM schedule’s checklist section.</p>
           ) : (
             <ul className="space-y-2 text-sm">
               {template.tasks.map((t) => (
@@ -53,7 +53,7 @@ export default async function TemplatePage({ params, searchParams }: { params: P
                   <Link href={`/tasks/${t.id}/edit`} className="link">
                     {t.asset.name}
                   </Link>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-neutral-500">
                     {t.title} · {describeInterval(t, t.asset.meterUnit)}
                   </div>
                 </li>

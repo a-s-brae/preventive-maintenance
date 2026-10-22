@@ -16,7 +16,7 @@ import { DownForm } from "@/components/down-form";
 import { MoreMenu } from "@/components/more-menu";
 import { MeterForm } from "@/components/meter-form";
 import { CompletedWorkOrderTable, OpenWorkOrderList } from "@/components/work-order-table";
-import { ButtonLink, Card, DownBadge, DueText, Empty, StatusBadge } from "@/components/ui";
+import { ButtonLink, Card, DownBadge, DueText, Empty, StatusBadge, StatusDot, Tabs } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +60,7 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
     <>
       {/* Header */}
       <div className="mb-5">
-        <div className="text-sm text-slate-500">
+        <div className="text-sm text-neutral-500">
           {location ? (
             <Link href={`/locations/${location.id}`} className="hover:underline">
               {pathLabel(location)}
@@ -79,9 +79,9 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
         </div>
         <div className="mt-1 flex flex-wrap items-start justify-between gap-3">
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{asset.name}</h1>
-            {openDowntime ? <DownBadge since={`since ${formatDateTime(openDowntime.startedAt)}`} /> : <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-800">Running</span>}
-            {asset.status !== "ACTIVE" && <span className="text-xs text-slate-500 uppercase">{asset.status.toLowerCase()}</span>}
+            <h1 className="text-xl font-semibold">{asset.name}</h1>
+            {openDowntime ? <DownBadge since={`since ${formatDateTime(openDowntime.startedAt)}`} /> : <StatusDot tone="green">Running</StatusDot>}
+            {asset.status !== "ACTIVE" && <span className="text-xs text-neutral-500 uppercase">{asset.status.toLowerCase()}</span>}
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {canWork && !openDowntime && <DownForm action={markAssetDown.bind(null, asset.id)} />}
@@ -100,7 +100,7 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
 
       {/* Down: the one thing on this page that has to stand out */}
       {openDowntime && (
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg bg-red-50 px-4 py-3 text-sm ring-1 ring-red-200">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-red-50 px-5 py-4 text-sm">
           <div>
             <strong className="text-red-800">Down for {formatDuration(downtimeHours([openDowntime], openDowntime.startedAt, now, now))}</strong>
             {openDowntime.reason && <span className="text-red-800"> — {openDowntime.reason}</span>}
@@ -124,19 +124,16 @@ export default async function AssetPage({ params, searchParams }: { params: Prom
       )}
 
       {/* Tabs */}
-      <nav className="mb-5 flex gap-1 overflow-x-auto border-b border-slate-200 text-sm" aria-label="Asset sections">
-        {tabs.map((t) => (
-          <Link
-            key={t.key}
-            href={t.key === "overview" ? `/assets/${asset.id}` : `/assets/${asset.id}?tab=${t.key}`}
-            aria-current={tab === t.key ? "page" : undefined}
-            className={`-mb-px border-b-2 px-3 py-2 whitespace-nowrap ${tab === t.key ? "border-sky-700 font-medium text-sky-800" : "border-transparent text-slate-600 hover:text-slate-900"}`}
-          >
-            {t.label}
-            {"count" in t && t.count ? <span className="ml-1.5 rounded-full bg-slate-200 px-1.5 text-xs text-slate-700">{t.count}</span> : null}
-          </Link>
-        ))}
-      </nav>
+      <Tabs
+        label="Asset sections"
+        active={tab}
+        tabs={tabs.map((t) => ({
+          key: t.key,
+          label: t.label,
+          href: t.key === "overview" ? `/assets/${asset.id}` : `/assets/${asset.id}?tab=${t.key}`,
+          count: "count" in t ? t.count : undefined,
+        }))}
+      />
 
       {tab === "overview" && <Overview asset={asset} locationLabel={pathLabel(location)} canManage={canManage} canWork={canWork} />}
       {tab === "work-orders" && <WorkOrdersTab assetId={asset.id} />}
@@ -162,8 +159,8 @@ async function Overview({ asset, locationLabel, canManage, canWork }: { asset: A
     ["Status", asset.status.toLowerCase()],
   ];
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      <div className="space-y-6 lg:col-span-2">
+    <div className="grid gap-6 @4xl:grid-cols-3">
+      <div className="space-y-6 @4xl:col-span-2">
         <Card title="Open work orders">
           <OpenWorkOrderList rows={open} showAsset={false} empty="No open work orders." />
         </Card>
@@ -180,7 +177,7 @@ async function Overview({ asset, locationLabel, canManage, canWork }: { asset: A
           {asset.children.length === 0 ? (
             <Empty>No sub-assets. Add the parts of this equipment you maintain separately (e.g. a dryer, chiller or robot).</Empty>
           ) : (
-            <ul className="divide-y divide-slate-100 text-sm">
+            <ul className="divide-y divide-neutral-100 text-sm">
               {asset.children.map((c) => (
                 <li key={c.id} className="flex items-center justify-between py-2">
                   <Link href={`/assets/${c.id}`} className="link">
@@ -198,20 +195,20 @@ async function Overview({ asset, locationLabel, canManage, canWork }: { asset: A
           <dl className="space-y-2 text-sm">
             {details.map(([k, v]) => (
               <div key={k} className="flex justify-between gap-4">
-                <dt className="text-slate-500">{k}</dt>
+                <dt className="text-neutral-500">{k}</dt>
                 <dd className="text-right">{v ?? "—"}</dd>
               </div>
             ))}
           </dl>
-          {asset.notes && <p className="mt-4 text-sm whitespace-pre-wrap text-slate-700">{asset.notes}</p>}
+          {asset.notes && <p className="mt-4 text-sm whitespace-pre-wrap text-neutral-700">{asset.notes}</p>}
         </Card>
         {asset.meterUnit && (
           <Card title="Meter">
             <div className="mb-3">
               <div className="text-2xl font-semibold tabular-nums">
-                {formatNumber(asset.currentMeter)} <span className="text-base font-normal text-slate-500">{asset.meterUnit}</span>
+                {formatNumber(asset.currentMeter)} <span className="text-base font-normal text-neutral-500">{asset.meterUnit}</span>
               </div>
-              <div className="text-xs text-slate-500">Updated {formatDate(asset.meterUpdatedAt)}</div>
+              <div className="text-xs text-neutral-500">Updated {formatDate(asset.meterUpdatedAt)}</div>
             </div>
             {canWork && <MeterForm action={recordMeter.bind(null, asset.id)} meterUnit={asset.meterUnit} />}
           </Card>
@@ -272,7 +269,7 @@ async function PmTab({
             <tbody>
               {schedules.map(({ task, due, openWorkOrder }) => (
                 <tr key={task.id} className={task.active ? "" : "opacity-50"}>
-                  <td>{due ? <StatusBadge status={due.status} /> : <span className="text-xs text-slate-500">paused</span>}</td>
+                  <td>{due ? <StatusBadge status={due.status} /> : <span className="text-xs text-neutral-500">paused</span>}</td>
                   <td>
                     {canManage ? (
                       <Link href={`/tasks/${task.id}/edit`} className="link">
@@ -281,10 +278,10 @@ async function PmTab({
                     ) : (
                       task.title
                     )}
-                    {Array.isArray(task.checklist) && task.checklist.length > 0 && <div className="text-xs text-slate-500">{task.checklist.length} checklist items</div>}
+                    {Array.isArray(task.checklist) && task.checklist.length > 0 && <div className="text-xs text-neutral-500">{task.checklist.length} checklist items</div>}
                   </td>
-                  <td className="text-slate-600">{describeInterval(task, meterUnit)}</td>
-                  <td className="text-slate-600">{formatDate(task.lastDoneAt)}</td>
+                  <td className="text-neutral-600">{describeInterval(task, meterUnit)}</td>
+                  <td className="text-neutral-600">{formatDate(task.lastDoneAt)}</td>
                   <td>{due ? <DueText due={due} meterUnit={meterUnit} /> : "—"}</td>
                   <td className="text-right whitespace-nowrap">
                     {openWorkOrder ? (
@@ -321,11 +318,11 @@ function DowntimeTab({ downtimes, now }: { downtimes: DowntimeRow[]; now: Date }
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        {[7, 30, 90].map((days) => (
-          <div key={days} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-            <div className="text-xs text-slate-500 sm:text-sm">Last {days} days</div>
-            <div className="text-lg font-semibold tabular-nums sm:text-2xl">{formatDuration(since(days))}</div>
-            <div className="text-xs text-slate-500">
+        {[7, 30, 90].map((days, i) => (
+          <div key={days} className={`rounded-2xl p-3 sm:p-5 ${i % 2 ? "bg-pastel-blue" : "bg-pastel-lavender"}`}>
+            <div className="text-xs text-ink sm:text-sm">Last {days} days</div>
+            <div className="mt-1 text-lg font-semibold sm:text-2xl">{formatDuration(since(days))}</div>
+            <div className="text-xs text-neutral-600">
               {count(days)} time{count(days) === 1 ? "" : "s"} down
             </div>
           </div>
@@ -351,14 +348,14 @@ function DowntimeTab({ downtimes, now }: { downtimes: DowntimeRow[]; now: Date }
                   <tr key={d.id}>
                     <td className="whitespace-nowrap">
                       {formatDateTime(d.startedAt)}
-                      <div className="text-xs text-slate-500">{d.startedBy ? userLabel(d.startedBy) : ""}</div>
+                      <div className="text-xs text-neutral-500">{d.startedBy ? userLabel(d.startedBy) : ""}</div>
                     </td>
                     <td className="whitespace-nowrap">
                       {d.endedAt ? formatDateTime(d.endedAt) : <DownBadge since="still down" />}
-                      <div className="text-xs text-slate-500">{d.endedBy ? userLabel(d.endedBy) : ""}</div>
+                      <div className="text-xs text-neutral-500">{d.endedBy ? userLabel(d.endedBy) : ""}</div>
                     </td>
                     <td className="tabular-nums">{formatDuration(downtimeHours([d], d.startedAt, d.endedAt ?? now, now))}</td>
-                    <td className="max-w-xs text-slate-600">{d.reason ?? "—"}</td>
+                    <td className="max-w-xs text-neutral-600">{d.reason ?? "—"}</td>
                     <td className="whitespace-nowrap">
                       {d.workOrder && (
                         <Link href={`/work-orders/${d.workOrder.id}`} className="link">
@@ -399,17 +396,17 @@ async function MeterTab({
 }) {
   const readings = await db.meterReading.findMany({ where: { assetId }, orderBy: { recordedAt: "desc" }, take: 100, include: { recordedBy: true } });
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
+    <div className="grid gap-6 @4xl:grid-cols-3">
       <Card title="Readings">
         <div className="mb-3">
           <div className="text-2xl font-semibold tabular-nums">
-            {formatNumber(currentMeter)} <span className="text-base font-normal text-slate-500">{meterUnit}</span>
+            {formatNumber(currentMeter)} <span className="text-base font-normal text-neutral-500">{meterUnit}</span>
           </div>
-          <div className="text-xs text-slate-500">Updated {formatDate(updatedAt)}</div>
+          <div className="text-xs text-neutral-500">Updated {formatDate(updatedAt)}</div>
         </div>
         {canWork && <MeterForm action={recordMeter.bind(null, assetId)} meterUnit={meterUnit} />}
       </Card>
-      <div className="lg:col-span-2">
+      <div className="@4xl:col-span-2">
         <Card title="Reading history">
           {readings.length === 0 ? (
             <Empty>No readings yet.</Empty>
@@ -429,7 +426,7 @@ async function MeterTab({
                     <td className="tabular-nums">
                       {formatNumber(r.value)} {meterUnit}
                     </td>
-                    <td className="text-slate-600">{r.recordedBy ? userLabel(r.recordedBy) : "—"}</td>
+                    <td className="text-neutral-600">{r.recordedBy ? userLabel(r.recordedBy) : "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -445,7 +442,7 @@ async function FilesTab({ assetId, meId, canWork, canManage }: { assetId: string
   const attachments = await db.attachment.findMany({ where: { assetId }, orderBy: { createdAt: "desc" }, include: { uploadedBy: true } });
   return (
     <Card title="Photos & documents">
-      <p className="mb-4 text-sm text-slate-600">Manuals, wiring diagrams, nameplate photos — anything you want at hand for this equipment.</p>
+      <p className="mb-4 text-sm text-neutral-600">Manuals, wiring diagrams, nameplate photos — anything you want at hand for this equipment.</p>
       <Attachments
         attachments={attachments}
         target={{ assetId }}

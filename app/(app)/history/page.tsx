@@ -35,7 +35,7 @@ export default async function HistoryPage({ searchParams }: { searchParams: Prom
         {pages > 1 && (
           <div className="mt-4 flex items-center justify-between text-sm">
             {page > 1 ? <Link href={`/history?page=${page - 1}`} className="link">← Newer</Link> : <span />}
-            <span className="text-slate-500">Page {page} of {pages}</span>
+            <span className="text-neutral-500">Page {page} of {pages}</span>
             {page < pages ? <Link href={`/history?page=${page + 1}`} className="link">Older →</Link> : <span />}
           </div>
         )}

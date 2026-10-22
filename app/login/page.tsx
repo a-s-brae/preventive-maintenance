@@ -27,10 +27,15 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     if (!error) redirect(next);
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
-        <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-          <h1 className="text-xl font-semibold">PM System</h1>
-          <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">{ERRORS[error] ?? GENERIC_ERROR}</p>
-          <p className="mt-3 text-sm text-slate-600">To sign in with a different email, close all browser windows and open the site again.</p>
+        <div className="w-full max-w-sm rounded-2xl bg-surface p-6 sm:p-8">
+          <h1 className="flex items-center gap-2 text-lg font-semibold">
+            <span className="flex size-7 items-center justify-center rounded-full bg-ink text-[11px] font-bold text-white" aria-hidden="true">
+              PM
+            </span>
+            PM System
+          </h1>
+          <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">{ERRORS[error] ?? GENERIC_ERROR}</p>
+          <p className="mt-3 text-sm text-neutral-600">To sign in with a different email, close all browser windows and open the site again.</p>
         </div>
       </main>
     );
@@ -60,18 +65,23 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
 
   return (
     <main className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-sm rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <h1 className="text-xl font-semibold">PM System</h1>
-        <p className="mt-1 text-sm text-slate-600">
+      <div className="w-full max-w-sm rounded-2xl bg-surface p-6 sm:p-8">
+        <h1 className="flex items-center gap-2 text-lg font-semibold">
+            <span className="flex size-7 items-center justify-center rounded-full bg-ink text-[11px] font-bold text-white" aria-hidden="true">
+              PM
+            </span>
+            PM System
+          </h1>
+        <p className="mt-1 text-sm text-neutral-600">
           {localLogin ? "Sign in with your company email." : "Sign in with your company email. We'll send you a link."}
         </p>
         {localLogin && (
-          <p className="mt-4 rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">
+          <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">
             Local mode: no email check. Anyone who can open this page can sign in with any company address.
           </p>
         )}
         {error && (
-          <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
+          <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">
             {ERRORS[error] ?? GENERIC_ERROR}
           </p>
         )}

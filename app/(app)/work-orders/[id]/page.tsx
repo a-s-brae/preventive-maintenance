@@ -144,12 +144,12 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
     <>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 text-sm text-slate-500">
+          <div className="flex items-center gap-2 text-sm text-neutral-500">
             {woNumber(wo.number)} <WoStatusBadge status={wo.status} />
           </div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">{wo.title}</h1>
+          <h1 className="mt-1 text-xl font-semibold">{wo.title}</h1>
           {/* The essentials, so they're visible on a phone without scrolling to Details. */}
-          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-slate-600">
+          <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-neutral-600">
             <Link href={`/assets/${wo.asset.id}`} className="link">
               {wo.asset.name}
             </Link>
@@ -182,7 +182,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid gap-6 @3xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-6">
           {(wo.description || wo.pmTask?.instructions) && (
             <Card title="Instructions">
@@ -196,7 +196,7 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
                 {wo.completionNotes ? (
                   <p className="text-sm whitespace-pre-wrap">{wo.completionNotes}</p>
                 ) : (
-                  <p className="text-sm text-slate-500">No notes.</p>
+                  <p className="text-sm text-neutral-500">No notes.</p>
                 )}
               </div>
             </Card>
@@ -215,17 +215,17 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
             </Card>
           )}
           <Card title="Time, parts & photos">
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-neutral-100">
               <section className="pb-4">
-                <h3 className="mb-2 text-sm font-medium text-slate-500">Time</h3>
+                <h3 className="mb-2 text-sm font-medium text-neutral-500">Time</h3>
                 <WorkOrderLabor workOrderId={wo.id} entries={wo.labor} meId={me.id} canWork={canWork} canManage={canManage} open={!complete} />
               </section>
               <section className="py-4">
-                <h3 className="mb-2 text-sm font-medium text-slate-500">Parts used</h3>
+                <h3 className="mb-2 text-sm font-medium text-neutral-500">Parts used</h3>
                 <WorkOrderParts workOrderId={wo.id} usages={wo.partUsages} parts={parts} canEdit={canWork} />
               </section>
               <section className="pt-4">
-                <h3 className="mb-2 text-sm font-medium text-slate-500">Photos &amp; files</h3>
+                <h3 className="mb-2 text-sm font-medium text-neutral-500">Photos &amp; files</h3>
                 <Attachments
                   attachments={wo.attachments}
                   target={{ workOrderId: wo.id }}
@@ -237,12 +237,12 @@ export default async function WorkOrderPage({ params }: { params: Promise<{ id: 
             </div>
           </Card>
         </div>
-        <div className="self-start lg:sticky lg:top-6">
+        <div className="self-start @3xl:sticky @3xl:top-20">
           <Card title="Details">
             <dl className="space-y-2.5 text-sm">
               {details.map(([k, v]) => (
                 <div key={k} className="flex justify-between gap-4">
-                  <dt className="text-slate-500">{k}</dt>
+                  <dt className="text-neutral-500">{k}</dt>
                   <dd className="text-right">{v}</dd>
                 </div>
               ))}

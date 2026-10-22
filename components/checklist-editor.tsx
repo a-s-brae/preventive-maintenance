@@ -46,7 +46,7 @@ export function ChecklistEditor({
 
   const picker = templates.length > 0 && (
     <label className="flex flex-wrap items-center gap-2 text-sm">
-      <span className="text-slate-600">Template:</span>
+      <span className="text-neutral-600">Template:</span>
       <select
         name="checklistTemplateId"
         value={templateId ?? ""}
@@ -73,14 +73,14 @@ export function ChecklistEditor({
       <div className="space-y-2">
         {picker}
         <input type="hidden" name="checklist" value={JSON.stringify(template.items)} />
-        <ol className="list-decimal space-y-1 rounded-md border border-slate-200 bg-slate-50 py-2 pr-3 pl-8 text-sm">
+        <ol className="list-decimal space-y-1 rounded-xl bg-white py-2 pr-3 pl-8 text-sm ring-1 ring-neutral-200/70">
           {template.items.map((item, i) => (
             <li key={i}>
-              {item.label} <span className="text-xs text-slate-500">· {CHECKLIST_TYPE_LABEL[item.type]}{item.unit ? ` (${item.unit})` : ""}{describeLimits(item) ? ` · OK ${describeLimits(item)}` : ""}</span>
+              {item.label} <span className="text-xs text-neutral-500">· {CHECKLIST_TYPE_LABEL[item.type]}{item.unit ? ` (${item.unit})` : ""}{describeLimits(item) ? ` · OK ${describeLimits(item)}` : ""}</span>
             </li>
           ))}
         </ol>
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-neutral-500">
           Follows the “{template.name}” template: changing the template changes this PM too. Pick “None — custom checklist” to edit it here instead.
         </p>
       </div>
@@ -91,7 +91,7 @@ export function ChecklistEditor({
     <div className="space-y-2">
       {picker}
       <input type="hidden" name="checklist" value={JSON.stringify(items)} />
-      {rows.length === 0 && <p className="text-sm text-slate-500">No checklist items yet.</p>}
+      {rows.length === 0 && <p className="text-sm text-neutral-500">No checklist items yet.</p>}
       {rows.map((row, i) => (
         <div key={row.key} className="flex flex-wrap items-center gap-2 sm:flex-nowrap">
           <input

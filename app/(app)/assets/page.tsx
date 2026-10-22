@@ -79,14 +79,14 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
         <Link
           href={qs({ down: down ? undefined : "1" })}
           aria-pressed={!!down}
-          className={`rounded-full px-3 py-1 text-sm ring-1 ring-inset ${down ? "bg-red-600 text-white ring-red-600" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}
+          className="chip"
         >
           Down now
         </Link>
         <Link
           href={qs({ all: all ? undefined : "1" })}
           aria-pressed={!!all}
-          className={`rounded-full px-3 py-1 text-sm ring-1 ring-inset ${all ? "bg-sky-700 text-white ring-sky-700" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}
+          className="chip"
         >
           Show retired
         </Link>
@@ -120,25 +120,25 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
                     <tr key={a.id}>
                       <td>
                         <div className="flex items-start" style={{ paddingLeft: `${a.depth * 1.25}rem` }}>
-                          {a.depth > 0 && <span className="mr-1.5 text-slate-400">└</span>}
+                          {a.depth > 0 && <span className="mr-1.5 text-neutral-400">└</span>}
                           <div>
                             <Link href={`/assets/${a.id}`} className="link">
                               {a.name}
                             </Link>
-                            {a.category && <div className="text-xs text-slate-500">{a.category}</div>}
+                            {a.category && <div className="text-xs text-neutral-500">{a.category}</div>}
                           </div>
                         </div>
                       </td>
                       <td>{a.downtimes.length ? <DownBadge /> : <span className="text-xs text-emerald-700">Running</span>}</td>
                       <td>
                         {a.status !== "ACTIVE" ? (
-                          <span className="text-xs text-slate-500">{a.status.toLowerCase()}</span>
+                          <span className="text-xs text-neutral-500">{a.status.toLowerCase()}</span>
                         ) : (
                           <StatusBadge status={worst?.status ?? "NO_SCHEDULE"} />
                         )}
                       </td>
-                      <td className="text-slate-600">{a.assetTag ?? "—"}</td>
-                      <td className="text-slate-600">
+                      <td className="text-neutral-600">{a.assetTag ?? "—"}</td>
+                      <td className="text-neutral-600">
                         {a.location ? (
                           <Link href={`/locations/${a.location.id}`} className="hover:underline">
                             {a.location.name}
@@ -147,7 +147,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
                           "—"
                         )}
                       </td>
-                      <td className="text-slate-600 tabular-nums">{a.meterUnit ? `${formatNumber(a.currentMeter)} ${a.meterUnit}` : "—"}</td>
+                      <td className="text-neutral-600 tabular-nums">{a.meterUnit ? `${formatNumber(a.currentMeter)} ${a.meterUnit}` : "—"}</td>
                       <td className="tabular-nums">{a._count.workOrders || "—"}</td>
                     </tr>
                   );
@@ -156,7 +156,7 @@ export default async function AssetsPage({ searchParams }: { searchParams: Promi
             </table>
           </div>
         )}
-        <p className="mt-3 text-xs text-slate-500">
+        <p className="mt-3 text-xs text-neutral-500">
           {rows.length} asset{rows.length === 1 ? "" : "s"}
         </p>
       </Card>

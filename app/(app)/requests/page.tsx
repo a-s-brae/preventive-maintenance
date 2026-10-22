@@ -6,7 +6,7 @@ import { can } from "@/lib/permissions";
 import { formatDateTime, requestNumber } from "@/lib/downtime";
 import { userLabel } from "@/lib/queries";
 import { PRIORITY_LABEL, woNumber } from "@/lib/work-orders";
-import { ButtonLink, Card, DownBadge, Empty, PageHeader, PriorityText, RequestStatusBadge } from "@/components/ui";
+import { ButtonLink, Card, DownBadge, Empty, PageHeader, PriorityText, RequestStatusBadge, Tabs } from "@/components/ui";
 
 export const dynamic = "force-dynamic";
 
@@ -40,17 +40,11 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
       <PageHeader title={can(user.role, "view") ? "Requests" : "My requests"}>
         <ButtonLink href="/requests/new">Report a problem</ButtonLink>
       </PageHeader>
-      <nav className="mb-4 flex w-fit flex-wrap gap-1 rounded-lg bg-slate-200/60 p-1 text-sm">
-        {VIEWS.map((v) => (
-          <Link
-            key={v.key}
-            href={v.key === "pending" ? "/requests" : `/requests?view=${v.key}`}
-            className={`rounded-md px-3 py-1.5 ${view.key === v.key ? "bg-white font-medium shadow-sm" : "text-slate-600 hover:text-slate-900"}`}
-          >
-            {v.label} <span className="text-xs text-slate-500">{countOf(v.status)}</span>
-          </Link>
-        ))}
-      </nav>
+      <Tabs
+        label="Request views"
+        active={view.key}
+        tabs={VIEWS.map((v) => ({ key: v.key, label: v.label, href: v.key === "pending" ? "/requests" : `/requests?view=${v.key}`, count: countOf(v.status) }))}
+      />
       <Card>
         {requests.length === 0 ? (
           <Empty>{view.key === "pending" ? "Nothing waiting for review." : "No requests here."}</Empty>
@@ -73,13 +67,13 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                       <Link href={`/requests/${r.id}`} className="link">
                         {r.title}
                       </Link>
-                      <div className="flex items-center gap-2 text-xs text-slate-500">
+                      <div className="flex items-center gap-2 text-xs text-neutral-500">
                         {requestNumber(r.number)}
                         {r.assetDown && <DownBadge />}
                       </div>
                     </td>
-                    <td className="text-slate-600">{r.asset?.name ?? r.location?.name ?? "—"}</td>
-                    <td className="whitespace-nowrap text-slate-600">
+                    <td className="text-neutral-600">{r.asset?.name ?? r.location?.name ?? "—"}</td>
+                    <td className="whitespace-nowrap text-neutral-600">
                       {formatDateTime(r.createdAt)}
                       <div className="text-xs">{r.requestedBy ? userLabel(r.requestedBy) : ""}</div>
                     </td>

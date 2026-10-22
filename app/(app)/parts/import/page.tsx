@@ -8,14 +8,14 @@ export default async function ImportPartsPage() {
   return (
     <>
       <PageHeader title="Import parts" />
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+      <div className="grid gap-6 @4xl:grid-cols-3">
+        <div className="@4xl:col-span-2">
           <Card>
             <ImportForm kind="parts" preview={previewImport} run={runImport} listHref="/parts" />
           </Card>
         </div>
         <Card title="How it works">
-          <ol className="list-decimal space-y-2 pl-5 text-sm text-slate-700">
+          <ol className="list-decimal space-y-2 pl-5 text-sm text-neutral-700">
             <li>
               Start from the <a href="/parts/import/template" className="link">template</a>, or <a href="/parts/export" className="link">export your parts</a> and edit
               that file in Excel.

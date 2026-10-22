@@ -34,14 +34,14 @@ export function WorkOrderLabor({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm">
           {entries.length === 0 ? (
-            <span className="text-slate-500">No time logged yet.</span>
+            <span className="text-neutral-500">No time logged yet.</span>
           ) : (
             <>
               Total: <strong className="font-semibold tabular-nums">{formatMinutes(totalMinutes(entries, now))}</strong>
             </>
           )}
           {others.length > 0 && (
-            <span className="ml-2 text-slate-500">
+            <span className="ml-2 text-neutral-500">
               ({others.map((e) => userLabel(e.user)).join(", ")} {others.length === 1 ? "is" : "are"} on the clock)
             </span>
           )}
@@ -49,7 +49,7 @@ export function WorkOrderLabor({
         {canWork && open && (
           mine ? (
             <form action={stopTimer.bind(null, workOrderId)} className="flex items-center gap-3">
-              <span className="rounded-md bg-violet-100 px-2 py-1 text-violet-900">
+              <span className="rounded-lg bg-violet-100 px-2 py-1 text-violet-900">
                 ⏱ <Timer since={mine.startedAt.toISOString()} />
               </span>
               <button type="submit" className="btn-primary">
@@ -66,12 +66,12 @@ export function WorkOrderLabor({
         )}
       </div>
       {done.length > 0 && (
-        <ul className="divide-y divide-slate-100 text-sm">
+        <ul className="divide-y divide-neutral-100 text-sm">
           {done.map((e) => (
             <li key={e.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
               <span>
                 <strong className="font-medium tabular-nums">{formatMinutes(entryMinutes(e, now))}</strong>
-                <span className="text-slate-500">
+                <span className="text-neutral-500">
                   {" "}
                   · {userLabel(e.user)} · {formatDate(e.startedAt)}
                   {e.note ? ` · ${e.note}` : ""}

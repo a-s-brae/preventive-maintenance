@@ -21,7 +21,7 @@ export default async function PmSchedulesPage() {
         <MoreMenu items={[{ label: "Export to Excel (CSV)", href: "/pm/export", download: true }]} />
       </PageHeader>
       <PmTabs active="schedules" showChecklists={can(me.role, "manage")} />
-      <p className="mb-4 text-sm text-slate-600">
+      <p className="mb-4 text-sm text-neutral-600">
         Each schedule creates a work order when it comes due. To add one, open the equipment and go to its <strong>PM schedules</strong> tab.
       </p>
       <Card>
@@ -44,7 +44,7 @@ export default async function PmSchedulesPage() {
               <tbody>
                 {rows.map(({ task, due, openWorkOrder }) => (
                   <tr key={task.id} className={task.active && task.asset.status === "ACTIVE" ? "" : "opacity-50"}>
-                    <td>{due && task.asset.status === "ACTIVE" ? <StatusBadge status={due.status} /> : <span className="text-xs text-slate-500">paused</span>}</td>
+                    <td>{due && task.asset.status === "ACTIVE" ? <StatusBadge status={due.status} /> : <span className="text-xs text-neutral-500">paused</span>}</td>
                     <td>
                       {can(me.role, "manage") ? (
                         <Link href={`/tasks/${task.id}/edit`} className="link">
@@ -53,16 +53,16 @@ export default async function PmSchedulesPage() {
                       ) : (
                         task.title
                       )}
-                      <div className="text-xs text-slate-500">{userLabel(task.defaultAssignee)}</div>
+                      <div className="text-xs text-neutral-500">{userLabel(task.defaultAssignee)}</div>
                     </td>
                     <td>
                       <Link href={`/assets/${task.asset.id}`} className="link">
                         {task.asset.name}
                       </Link>
                     </td>
-                    <td className="text-slate-600">{describeInterval(task, task.asset.meterUnit)}</td>
+                    <td className="text-neutral-600">{describeInterval(task, task.asset.meterUnit)}</td>
                     <td className="text-sm">{due ? <DueText due={due} meterUnit={task.asset.meterUnit} /> : "—"}</td>
-                    <td className="text-slate-600">{formatDate(task.lastDoneAt)}</td>
+                    <td className="text-neutral-600">{formatDate(task.lastDoneAt)}</td>
                     <td className="whitespace-nowrap">
                       {openWorkOrder ? (
                         <Link href={`/work-orders/${openWorkOrder.id}`} className="link">

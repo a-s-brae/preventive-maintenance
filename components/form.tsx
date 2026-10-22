@@ -33,9 +33,9 @@ export function ActionForm({ action, className, children }: { action: Action; cl
 export function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="mb-1 block text-sm font-medium text-slate-700">{label}</span>
+      <span className="mb-1.5 block text-sm font-medium text-ink">{label}</span>
       {children}
-      {hint && <span className="mt-1 block text-xs text-slate-500">{hint}</span>}
+      {hint && <span className="mt-1 block text-xs text-neutral-500">{hint}</span>}
     </label>
   );
 }
@@ -52,7 +52,7 @@ export function SubmitButton({ children, className = "btn-primary" }: { children
 
 export function FormError({ error }: { error?: string }) {
   if (!error) return null;
-  return <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">{error}</p>;
+  return <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">{error}</p>;
 }
 
 /** A button that asks for confirmation before running a server action. */

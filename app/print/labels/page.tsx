@@ -46,7 +46,7 @@ export default async function LabelsPage({ searchParams }: { searchParams: Promi
       <header className="mb-5 flex flex-wrap items-start justify-between gap-4 print:hidden">
         <div>
           <h1 className="text-2xl font-bold">Equipment QR labels</h1>
-          <p className="mt-1 max-w-xl text-sm text-slate-600">
+          <p className="mt-1 max-w-xl text-sm text-neutral-600">
             {labels.length} {labels.length === 1 ? "label" : "labels"}, 2″ × 4″ — prints ten to a sheet on Avery 5163 / 8163, or on plain paper to
             cut out and laminate. Print at 100% (actual size). Scanning a label opens the asset for maintenance staff, and “Report a problem” for
             everyone else.
@@ -61,18 +61,18 @@ export default async function LabelsPage({ searchParams }: { searchParams: Promi
         </p>
       )}
       {labels.length === 0 ? (
-        <p className="text-sm text-slate-500">No equipment to label.</p>
+        <p className="text-sm text-neutral-500">No equipment to label.</p>
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,4in)] justify-center gap-x-[0.19in] print:gap-y-0">
           {labels.map((l) => (
-            <div key={l.id} className="flex h-[2in] w-[4in] break-inside-avoid items-center gap-3 overflow-hidden rounded-md border border-dashed border-slate-300 p-[0.15in] print:rounded-none print:border-transparent">
+            <div key={l.id} className="flex h-[2in] w-[4in] break-inside-avoid items-center gap-3 overflow-hidden rounded-md border border-dashed border-neutral-300 p-[0.15in] print:rounded-none print:border-transparent">
               <div className="size-[1.6in] shrink-0 [&_svg]:size-full" role="img" aria-label={`QR code for ${l.name}`} dangerouslySetInnerHTML={{ __html: l.svg }} />
               <div className="flex min-w-0 flex-1 flex-col self-stretch">
-                <div className="text-[8pt] font-semibold tracking-wide text-slate-500 uppercase">{ORG_NAME} maintenance</div>
+                <div className="text-[8pt] font-semibold tracking-wide text-neutral-500 uppercase">{ORG_NAME} maintenance</div>
                 <div className="mt-1 line-clamp-3 text-[13pt] leading-tight font-bold">{l.name}</div>
                 {l.assetTag && <div className="mt-1 font-mono text-[11pt]">{l.assetTag}</div>}
-                {l.location && <div className="mt-0.5 line-clamp-2 text-[8pt] text-slate-600">{l.location}</div>}
-                <div className="mt-auto text-[7.5pt] leading-snug text-slate-700">Scan to report a problem or see its maintenance history</div>
+                {l.location && <div className="mt-0.5 line-clamp-2 text-[8pt] text-neutral-600">{l.location}</div>}
+                <div className="mt-auto text-[7.5pt] leading-snug text-neutral-700">Scan to report a problem or see its maintenance history</div>
               </div>
             </div>
           ))}

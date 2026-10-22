@@ -63,10 +63,10 @@ export default async function PrintWorkOrder({ params }: { params: Promise<{ id:
           <table className="w-full">
             <tbody>
               {results.map((r, i) => (
-                <tr key={i} className="border-b border-slate-200">
+                <tr key={i} className="border-b border-neutral-200">
                   <td className="py-1 pr-4">
                     {r.label}
-                    {r.note && <div className="text-xs text-slate-600">Note: {r.note}</div>}
+                    {r.note && <div className="text-xs text-neutral-600">Note: {r.note}</div>}
                   </td>
                   <td className={`py-1 text-right font-medium ${r.value === "FAIL" ? "text-red-700" : ""}`}>{formatValue(r)}</td>
                 </tr>
@@ -82,7 +82,7 @@ export default async function PrintWorkOrder({ params }: { params: Promise<{ id:
         <Section title="Parts used">
           <table className="w-full">
             <thead>
-              <tr className="text-left text-xs text-slate-500">
+              <tr className="text-left text-xs text-neutral-500">
                 <th className="py-1">Part</th>
                 <th className="py-1">Qty</th>
                 <th className="py-1 text-right">Cost</th>
@@ -90,7 +90,7 @@ export default async function PrintWorkOrder({ params }: { params: Promise<{ id:
             </thead>
             <tbody>
               {wo.partUsages.map((u) => (
-                <tr key={u.id} className="border-b border-slate-200">
+                <tr key={u.id} className="border-b border-neutral-200">
                   <td className="py-1">
                     {u.part.name}
                     {u.part.partNumber ? ` (${u.part.partNumber})` : ""}
@@ -140,7 +140,7 @@ export default async function PrintWorkOrder({ params }: { params: Promise<{ id:
           <div className="grid grid-cols-3 gap-2">
             {wo.attachments.filter((a) => isImage(a.mimeType)).map((a) => (
               // eslint-disable-next-line @next/next/no-img-element -- auth-checked file route
-              <img key={a.id} src={`/files/${a.id}`} alt={a.fileName} className="aspect-[4/3] w-full rounded border border-slate-200 bg-slate-50 object-contain" />
+              <img key={a.id} src={`/files/${a.id}`} alt={a.fileName} className="aspect-[4/3] w-full rounded border border-neutral-200 bg-neutral-50 object-contain" />
             ))}
           </div>
         </Section>
@@ -149,8 +149,8 @@ export default async function PrintWorkOrder({ params }: { params: Promise<{ id:
         <div className="grid grid-cols-2 gap-10 pt-6">
           {["Performed by", "Reviewed by"].map((label) => (
             <div key={label}>
-              <div className="h-8 border-b border-slate-900" />
-              <div className="mt-1 flex justify-between text-xs text-slate-600">
+              <div className="h-8 border-b border-neutral-900" />
+              <div className="mt-1 flex justify-between text-xs text-neutral-600">
                 <span>{label}</span>
                 <span>Date</span>
               </div>

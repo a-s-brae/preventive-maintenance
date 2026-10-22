@@ -32,12 +32,12 @@ export function TemplateForm({
         </Field>
       </div>
       <div>
-        <div className="mb-1 text-sm font-medium text-slate-700">Checklist *</div>
-        <p className="mb-2 text-xs text-slate-500">Pass / fail for inspections, number for readings (with an OK range), text for notes.</p>
+        <div className="mb-1 text-sm font-medium text-neutral-700">Checklist *</div>
+        <p className="mb-2 text-xs text-neutral-500">Pass / fail for inspections, number for readings (with an OK range), text for notes.</p>
         <ChecklistEditor initial={items} />
       </div>
       {usedBy > 0 && (
-        <p className="rounded-md bg-sky-50 px-3 py-2 text-sm text-sky-900 ring-1 ring-sky-200">
+        <p className="rounded-lg bg-accent-50 px-3 py-2 text-sm text-accent-900 ring-1 ring-accent-200">
           {usedBy} PM {usedBy === 1 ? "schedule follows" : "schedules follow"} this template. Saving updates {usedBy === 1 ? "its" : "their"} checklist, and
           any of their work orders that haven’t been started.
         </p>

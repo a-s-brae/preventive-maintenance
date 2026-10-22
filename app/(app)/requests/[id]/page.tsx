@@ -46,23 +46,23 @@ export default async function RequestPage({ params, searchParams }: { params: Pr
         </div>
       )}
       <div className="mb-6">
-        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-500">
           {requestNumber(r.number)}
           <RequestStatusBadge status={r.status} />
           {r.assetDown && <DownBadge since="reported down" />}
         </div>
-        <h1 className="mt-1 text-2xl font-semibold tracking-tight">{r.title}</h1>
+        <h1 className="mt-1 text-xl font-semibold">{r.title}</h1>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+      <div className="grid gap-6 @4xl:grid-cols-3">
+        <div className="space-y-6 @4xl:col-span-2">
           <Card title="Details">
-            <p className="text-sm whitespace-pre-wrap">{r.description ?? <span className="text-slate-500">No details given.</span>}</p>
+            <p className="text-sm whitespace-pre-wrap">{r.description ?? <span className="text-neutral-500">No details given.</span>}</p>
           </Card>
 
           {r.status === "PENDING" && !pending && (
             <Card title="Status">
-              <p className="text-sm text-slate-600">Waiting for a supervisor to review it.</p>
+              <p className="text-sm text-neutral-600">Waiting for a supervisor to review it.</p>
             </Card>
           )}
           {r.status === "APPROVED" && r.workOrder && (
@@ -80,7 +80,7 @@ export default async function RequestPage({ params, searchParams }: { params: Pr
                 )}{" "}
                 ({STATUS_LABEL[r.workOrder.status].toLowerCase()}).
               </p>
-              {r.reviewNote && <p className="mt-2 text-sm text-slate-600">Note: {r.reviewNote}</p>}
+              {r.reviewNote && <p className="mt-2 text-sm text-neutral-600">Note: {r.reviewNote}</p>}
             </Card>
           )}
           {r.status === "REJECTED" && (
@@ -113,7 +113,7 @@ export default async function RequestPage({ params, searchParams }: { params: Pr
           <dl className="space-y-2.5 text-sm">
             {details.map(([k, v]) => (
               <div key={k} className="flex justify-between gap-4">
-                <dt className="text-slate-500">{k}</dt>
+                <dt className="text-neutral-500">{k}</dt>
                 <dd className="text-right">{v}</dd>
               </div>
             ))}

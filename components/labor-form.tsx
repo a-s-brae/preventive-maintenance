@@ -19,7 +19,7 @@ export function AddLaborForm({ action }: { action: Action }) {
   }, [state]);
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="text-sm text-sky-700 hover:underline">
+      <button type="button" onClick={() => setOpen(true)} className="text-sm text-accent-700 hover:underline">
         + Log time manually
       </button>
     );
@@ -27,19 +27,19 @@ export function AddLaborForm({ action }: { action: Action }) {
   return (
     <form ref={ref} action={formAction} className="flex flex-wrap items-end gap-2">
       <label>
-        <span className="mb-1 block text-sm font-medium text-slate-700">Hours</span>
+        <span className="mb-1 block text-sm font-medium text-neutral-700">Hours</span>
         <input name="hours" type="number" min="0" max="24" className="input w-20" />
       </label>
       <label>
-        <span className="mb-1 block text-sm font-medium text-slate-700">Minutes</span>
+        <span className="mb-1 block text-sm font-medium text-neutral-700">Minutes</span>
         <input name="minutes" type="number" min="0" max="59" className="input w-20" />
       </label>
       <label>
-        <span className="mb-1 block text-sm font-medium text-slate-700">Date</span>
+        <span className="mb-1 block text-sm font-medium text-neutral-700">Date</span>
         <input name="date" type="date" required defaultValue={toDateInput(new Date())} className="input" />
       </label>
       <label className="min-w-0 flex-1">
-        <span className="mb-1 block text-sm font-medium text-slate-700">Note</span>
+        <span className="mb-1 block text-sm font-medium text-neutral-700">Note</span>
         <input name="note" placeholder="Optional" className="input" />
       </label>
       <SubmitButton className="btn-secondary">Log time</SubmitButton>

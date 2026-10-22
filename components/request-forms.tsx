@@ -50,7 +50,7 @@ export function RequestForm({
           </select>
         </Field>
       </div>
-      <label className="flex items-start gap-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-900 ring-1 ring-red-200">
+      <label className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-900 ring-1 ring-red-200">
         <input type="checkbox" name="assetDown" className="mt-0.5 size-4" />
         <span>
           <strong className="font-medium">The machine is down</strong> — it's stopped or can't be used. (Starts logging downtime now.)

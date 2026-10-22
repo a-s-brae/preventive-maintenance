@@ -79,11 +79,11 @@ export default async function PrintAssetHistory({ params, searchParams }: { para
       )}
       <Section title="Work done">
         {wos.length === 0 ? (
-          <p className="text-slate-500">No completed work orders in this period.</p>
+          <p className="text-neutral-500">No completed work orders in this period.</p>
         ) : (
           <table className="w-full">
             <thead>
-              <tr className="text-left text-xs text-slate-500">
+              <tr className="text-left text-xs text-neutral-500">
                 <th className="py-1">Date</th>
                 <th className="py-1">Work order</th>
                 <th className="py-1">By</th>
@@ -95,7 +95,7 @@ export default async function PrintAssetHistory({ params, searchParams }: { para
               {wos.map((w) => {
                 const s = summarize(parseResults(w.checklistResults));
                 return (
-                  <tr key={w.id} className="border-b border-slate-200 align-top">
+                  <tr key={w.id} className="border-b border-neutral-200 align-top">
                     <td className="py-1 pr-2 whitespace-nowrap">{formatDate(w.completedAt)}</td>
                     <td className="py-1 pr-2">
                       {woNumber(w.number)} · {TYPE_LABEL[w.type]}

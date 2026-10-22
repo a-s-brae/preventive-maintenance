@@ -1,210 +1,322 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { crumbs } from "@/lib/breadcrumbs";
+import { Icon } from "./icons";
+import { Sidebar, type Counts, type PageLink, type Role } from "./sidebar";
 
-type Counts = { overdue: number; mine: number; pendingRequests: number; lowStock: number; unread: number };
-type Role = "ADMIN" | "TECH" | "REQUESTER";
+const DEFAULT_FAVORITES: PageLink[] = [
+  { href: "/work-orders?view=mine", title: "Assigned to me" },
+  { href: "/work-orders?due=overdue", title: "Overdue work" },
+];
+/** Record pages that go in "Recently". */
+const RECORD = /^\/(work-orders|assets|parts|requests|locations|tasks|checklists)\/(?!new$|import$|calendar$|export$)[^/]+$/;
 
-type NavItem = { href: string; label: string; icon: keyof typeof ICONS; badge?: { count: number; tone: "red" | "blue" | "amber"; title: string } };
-
-function navSections(counts: Counts, role: Role): { title?: string; items: NavItem[] }[] {
-  if (role === "REQUESTER") {
-    return [
-      {
-        items: [
-          { href: "/", label: "Home", icon: "home" },
-          { href: "/requests", label: "My requests", icon: "inbox" },
-        ],
-      },
-    ];
+// Favourites and recent pages are a per-browser convenience; storage may be blocked.
+function readList(key: string): PageLink[] | null {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(key) ?? "null");
+    if (!Array.isArray(v)) return null;
+    return v.filter((x): x is PageLink => typeof x?.href === "string" && x.href.startsWith("/") && typeof x?.title === "string");
+  } catch {
+    return null;
   }
-  return [
-    {
-      items: [
-        { href: "/", label: "Dashboard", icon: "home" },
-        { href: "/work-orders", label: "Work orders", icon: "clipboard", badge: { count: counts.overdue, tone: "red", title: "overdue" } },
-        { href: "/requests", label: "Requests", icon: "inbox", badge: { count: counts.pendingRequests, tone: "amber", title: "waiting for review" } },
-        { href: "/assets", label: "Equipment", icon: "cube" },
-        { href: "/parts", label: "Parts", icon: "box", badge: { count: counts.lowStock, tone: "amber", title: "low or out of stock" } },
-        { href: "/pm", label: "PM schedules", icon: "repeat" },
-        { href: "/reports", label: "Reports", icon: "chart" },
-      ],
-    },
-    ...(role === "ADMIN" ? [{ title: "Admin", items: [{ href: "/people", label: "People", icon: "users" } as NavItem] }] : []),
-  ];
+}
+function writeList(key: string, list: PageLink[]) {
+  try {
+    localStorage.setItem(key, JSON.stringify(list));
+  } catch {}
+}
+/** Panel choices live in cookies so the server draws the page the same way next time. */
+function remember(name: string, open: boolean) {
+  document.cookie = `${name}=${open ? "open" : "closed"}; path=/; max-age=31536000; samesite=lax`;
 }
 
-/** The pages each sidebar link covers (its tabs and sub-pages). */
-const SECTION_PATHS: Record<string, string[]> = {
-  "/work-orders": ["/work-orders", "/history"],
-  "/assets": ["/assets", "/locations"],
-  "/pm": ["/pm", "/checklists", "/tasks"],
-};
+/** Below this width the activity panel stays closed unless you open it. */
+const RAIL_AUTO = "min-[1440px]:block";
 
-/** What "+ New" offers, by role. */
-function newItems(role: Role): { href: string; label: string }[] {
-  return [
-    { href: "/work-orders/new", label: "Work order" },
-    { href: "/requests/new", label: "Report a problem" },
-    ...(role === "ADMIN"
-      ? [
-          { href: "/assets/new", label: "Equipment (asset)" },
-          { href: "/parts/new", label: "Part" },
-        ]
-      : []),
-  ];
+/** The page's name: its heading, plus (for favourites) the tab and filters that are on. */
+function pageTitle(withFilters: boolean): string | null {
+  const main = document.getElementById("main");
+  const h1 = main?.querySelector("h1")?.textContent?.trim();
+  if (!main || !h1) return null;
+  if (!withFilters) return h1;
+  const on = [main.querySelector('nav [aria-current="page"]'), ...main.querySelectorAll('[aria-pressed="true"]')].map((e) => e?.textContent?.trim());
+  return [h1, ...on].filter((x, i, all): x is string => !!x && all.indexOf(x) === i).join(" · ");
 }
 
-/** Sidebar on large screens; a top bar with a slide-out menu on phones and tablets. */
+/** Sidebar, top bar and (for staff) the activity panel around every page. */
 export function AppShell({
-  email,
+  user,
   role,
   counts,
   signOutAction,
+  rail,
+  initialSidebar,
+  initialRail,
   children,
 }: {
-  email: string;
+  user: { id: string; name: string; email: string };
   role: Role;
   counts: Counts;
   /** Absent with team password sign-in, where the browser holds the sign-in. */
   signOutAction?: () => Promise<void>;
+  /** The right-hand panel (staff only). */
+  rail?: React.ReactNode;
+  initialSidebar: boolean;
+  /** "auto": shown on wide screens only. */
+  initialRail: "auto" | "open" | "closed";
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(false);
   const pathname = usePathname();
-  // Close the menu after navigating.
-  useEffect(() => setOpen(false), [pathname]);
-  // Esc closes the menu.
+  const params = useSearchParams();
+  const search = params.toString();
+  const staff = role !== "REQUESTER";
+
+  const [drawer, setDrawer] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(initialSidebar);
+  const [railMode, setRailMode] = useState(initialRail);
+  // "auto" shows the panel on wide screens only (where it leaves the page enough room).
+  const [wide, setWide] = useState(false);
   useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    const mq = window.matchMedia("(min-width: 1440px)");
+    const update = () => setWide(mq.matches);
+    update();
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
+  const railShown = railMode === "open" || (railMode === "auto" && wide);
+  const [favorites, setFavorites] = useState<PageLink[]>(DEFAULT_FAVORITES);
+  const [recent, setRecent] = useState<PageLink[]>([]);
+
+  useEffect(() => {
+    setFavorites(readList("pm-favorites") ?? DEFAULT_FAVORITES);
+    setRecent(readList("pm-recent") ?? []);
+  }, []);
+
+  // Close the phone menu after navigating, and on Esc.
+  useEffect(() => setDrawer(false), [pathname, search]);
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setDrawer(false);
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open]);
+  }, [drawer]);
 
-  const sidebar = (
-    <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between px-5 py-5">
-        <Link href="/" className="flex items-center gap-2 text-base font-semibold text-white">
-          <span className="flex size-7 items-center justify-center rounded-md bg-sky-600 text-xs font-bold">PM</span>
-          PM System
-        </Link>
-        {/* On phones the bell is in the top bar instead. */}
-        <Bell count={counts.unread} className="-mr-1.5 hidden text-slate-300 hover:bg-white/10 hover:text-white lg:flex" />
-      </div>
-      <div className="px-3 pb-4">
-        {role === "REQUESTER" ? (
-          <Link href="/requests/new" className="flex items-center justify-center gap-2 rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500">
-            <Icon name="alert" />
-            Report a problem
-          </Link>
-        ) : (
-          <NewMenu items={newItems(role)} />
-        )}
-      </div>
-      <Nav counts={counts} role={role} pathname={pathname} />
-      <form action={signOutAction} className="border-t border-white/10 px-5 py-4 text-sm">
-        <div className="truncate text-slate-400" title={email}>
-          {email}
-        </div>
-        {signOutAction ? (
-          <button type="submit" className="mt-1 text-slate-200 hover:text-white hover:underline">
-            Sign out
-          </button>
-        ) : (
-          <div className="mt-1 text-xs text-slate-500">Signed in with the team password</div>
-        )}
-      </form>
-    </div>
+  // Remember the record pages you open (once the page's heading is there).
+  useEffect(() => {
+    if (!staff || !RECORD.test(pathname)) return;
+    let tries = 0;
+    const timer = setInterval(() => {
+      const title = pageTitle(false);
+      if (!title && ++tries < 20) return;
+      clearInterval(timer);
+      if (!title) return;
+      setRecent((list) => {
+        const next = [{ href: pathname, title }, ...list.filter((l) => l.href !== pathname)].slice(0, 5);
+        writeList("pm-recent", next);
+        return next;
+      });
+    }, 100);
+    return () => clearInterval(timer);
+  }, [pathname, staff]);
+
+  const here = search ? `${pathname}?${search}` : pathname;
+  const starred = favorites.some((f) => f.href === here);
+  const toggleStar = () => {
+    const next = starred ? favorites.filter((f) => f.href !== here) : [...favorites, { href: here, title: pageTitle(true) ?? here }].slice(-8);
+    setFavorites(next);
+    writeList("pm-favorites", next);
+  };
+
+  const sidebar = (onClose?: () => void) => (
+    <Sidebar
+      role={role}
+      counts={counts}
+      pathname={pathname}
+      view={params.get("view")}
+      favorites={favorites}
+      recent={recent}
+      user={user}
+      signOutAction={signOutAction}
+      onClose={onClose}
+    />
   );
 
   return (
-    <>
-      <aside className="fixed inset-y-0 left-0 hidden w-60 bg-slate-900 lg:block">{sidebar}</aside>
+    <div className="flex min-h-screen">
+      <a href="#main" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:ring-2 focus:ring-accent-300">
+        Skip to content
+      </a>
 
-      <header className="sticky top-0 z-30 flex h-14 items-center gap-3 bg-slate-900 px-4 text-white lg:hidden">
-        <button type="button" onClick={() => setOpen(true)} aria-label="Open menu" aria-expanded={open} className="-ml-1 rounded-md p-1.5 hover:bg-white/10">
-          <Icon name="menu" />
-        </button>
-        <Link href="/" className="font-semibold">
-          PM System
-        </Link>
-        <div className="ml-auto flex items-center gap-2">
-          {role !== "REQUESTER" && counts.overdue > 0 && (
-            <Link href="/work-orders?due=overdue" className="rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-medium">
-              {counts.overdue} overdue
-            </Link>
-          )}
-          <Bell count={counts.unread} className="-mr-1.5 hover:bg-white/10" />
-        </div>
-      </header>
-
-      {open && (
-        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
-          <div className="absolute inset-0 bg-slate-900/50" onClick={() => setOpen(false)} />
-          <aside className="absolute inset-y-0 left-0 w-72 max-w-[85%] bg-slate-900 shadow-xl">
-            <button type="button" onClick={() => setOpen(false)} aria-label="Close menu" className="absolute top-4 right-3 rounded-md p-1.5 text-slate-300 hover:bg-white/10">
-              <Icon name="close" />
-            </button>
-            {sidebar}
-          </aside>
-        </div>
+      {sidebarOpen && (
+        <aside className="sticky top-0 hidden h-screen w-[212px] shrink-0 border-r border-neutral-200/70 bg-white lg:block print:hidden">{sidebar()}</aside>
       )}
 
-      <main className="lg:pl-60">
-        <div className="px-4 py-6 lg:px-8 lg:py-7">{children}</div>
-      </main>
-    </>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-1 border-b border-neutral-200/70 bg-white/95 px-3 backdrop-blur sm:gap-2 sm:px-6 lg:px-7 print:hidden">
+          <button type="button" onClick={() => setDrawer(true)} aria-label="Open menu" aria-expanded={drawer} className="btn-ghost lg:hidden">
+            <Icon name="panelLeft" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setSidebarOpen(!sidebarOpen);
+              remember("pm-sidebar", !sidebarOpen);
+            }}
+            aria-label={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+            title={sidebarOpen ? "Hide sidebar" : "Show sidebar"}
+            className="btn-ghost hidden lg:inline-flex"
+          >
+            <Icon name="panelLeft" />
+          </button>
+          {staff && (
+            <button
+              type="button"
+              onClick={toggleStar}
+              aria-pressed={starred}
+              aria-label={starred ? "Remove this page from favorites" : "Add this page to favorites"}
+              title={starred ? "Remove from favorites" : "Add to favorites"}
+              className="btn-ghost hidden aria-pressed:bg-transparent sm:inline-flex"
+            >
+              <Icon name="star" filled={starred} className={`size-5 ${starred ? "text-amber-400" : ""}`} />
+            </button>
+          )}
+          <Breadcrumb pathname={pathname} role={role} />
+
+          <div className="ml-auto flex items-center gap-1 sm:gap-2">
+            {staff && <SearchBox />}
+            {staff ? (
+              <NewMenu admin={role === "ADMIN"} />
+            ) : (
+              <Link href="/requests/new" className="btn-primary h-8 px-3">
+                Report a problem
+              </Link>
+            )}
+            <Bell count={counts.unread} />
+            {rail && (
+              <button
+                type="button"
+                onClick={() => {
+                  setRailMode(railShown ? "closed" : "open");
+                  remember("pm-rail", !railShown);
+                }}
+                aria-label={railShown ? "Hide activity panel" : "Show activity panel"}
+                aria-expanded={railShown}
+                title={railShown ? "Hide activity panel" : "Show activity panel"}
+                className="btn-ghost hidden xl:inline-flex"
+              >
+                <Icon name="panelRight" />
+              </button>
+            )}
+          </div>
+        </header>
+
+        {/* A size container: pages lay out by the room they actually get between the panels. */}
+        <main id="main" className="@container flex-1 px-4 py-6 sm:px-6 lg:px-7">
+          {children}
+        </main>
+      </div>
+
+      {rail && railMode !== "closed" && (
+        <aside
+          aria-label="Notifications and activity"
+          className={`sticky top-0 hidden h-screen w-[280px] shrink-0 overflow-y-auto border-l border-neutral-200/70 bg-white print:hidden ${railMode === "open" ? "xl:block" : RAIL_AUTO}`}
+        >
+          {rail}
+        </aside>
+      )}
+
+      {drawer && (
+        <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+          <div className="absolute inset-0 bg-ink/30" onClick={() => setDrawer(false)} />
+          <aside className="absolute inset-y-0 left-0 w-72 max-w-[85%] bg-white shadow-xl">{sidebar(() => setDrawer(false))}</aside>
+        </div>
+      )}
+    </div>
   );
 }
 
-function Nav({ counts, role, pathname }: { counts: Counts; role: Role; pathname: string }) {
-  const isActive = (href: string) =>
-    href === "/" ? pathname === "/" : (SECTION_PATHS[href] ?? [href]).some((p) => pathname === p || pathname.startsWith(`${p}/`));
+// ─── Breadcrumb ──────────────────────────────────────────────────────────────
+
+function Breadcrumb({ pathname, role }: { pathname: string; role: Role }) {
+  const items = crumbs(pathname, role);
   return (
-    <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4" aria-label="Main">
-      {navSections(counts, role).map((section, i) => (
-        <div key={i}>
-          {section.title && <div className="mb-1 px-2 text-xs font-medium tracking-wide text-slate-400 uppercase">{section.title}</div>}
-          <ul className="space-y-0.5">
-            {section.items.map((item) => {
-              const active = isActive(item.href);
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    aria-current={active ? "page" : undefined}
-                    className={`flex items-center gap-3 rounded-md px-2 py-2 text-sm ${
-                      active ? "bg-white/10 font-medium text-white" : "text-slate-300 hover:bg-white/5 hover:text-white"
-                    }`}
-                  >
-                    <Icon name={item.icon} />
-                    <span className="flex-1">{item.label}</span>
-                    {item.badge && item.badge.count > 0 && (
-                      <span
-                        title={`${item.badge.count} ${item.badge.title}`}
-                        className={`min-w-5 rounded-full px-1.5 text-center text-xs leading-5 font-medium ${
-                          item.badge.tone === "red" ? "bg-red-600 text-white" : item.badge.tone === "amber" ? "bg-amber-400 text-slate-900" : "bg-sky-600 text-white"
-                        }`}
-                      >
-                        {item.badge.count}
-                      </span>
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
+    <nav aria-label="Breadcrumb" className="ml-1 min-w-0 text-sm">
+      <ol className="flex items-center gap-2">
+        {items.map((c, i) => {
+          const last = i === items.length - 1;
+          return (
+            <li key={i} className={`min-w-0 items-center gap-2 ${last ? "flex" : "hidden sm:flex"}`}>
+              {i > 0 && (
+                <span className="hidden text-neutral-300 sm:inline" aria-hidden="true">
+                  /
+                </span>
+              )}
+              {last ? (
+                <span aria-current="page" className="truncate text-ink">
+                  {c.label}
+                </span>
+              ) : c.href ? (
+                <Link href={c.href} className="whitespace-nowrap text-neutral-500 hover:text-ink">
+                  {c.label}
+                </Link>
+              ) : (
+                <span className="whitespace-nowrap text-neutral-500">{c.label}</span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
     </nav>
   );
 }
 
+// ─── Top bar controls ────────────────────────────────────────────────────────
+
+/** Search everything; ⌘K / Ctrl K jumps here from anywhere. */
+function SearchBox() {
+  const input = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  const [mac, setMac] = useState(true);
+  useEffect(() => {
+    setMac(/Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent));
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        // The box is hidden on phones; go to the search page there.
+        if (input.current?.offsetParent) input.current.focus();
+        else router.push("/search");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [router]);
+  return (
+    <>
+      <form action="/search" role="search" className="relative hidden md:block">
+        <Icon name="search" className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-neutral-400" />
+        <input
+          ref={input}
+          name="q"
+          type="search"
+          placeholder="Search"
+          aria-label="Search work orders, equipment, parts and requests"
+          className="h-8 w-44 rounded-lg border border-transparent bg-neutral-100 pr-12 pl-8 text-sm text-ink placeholder:text-neutral-400 focus:border-accent-300 focus:bg-white focus:ring-2 focus:ring-accent-100 focus:outline-none lg:w-52 [&::-webkit-search-cancel-button]:hidden"
+        />
+        <kbd className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 font-sans text-xs text-neutral-400">{mac ? "⌘K" : "Ctrl K"}</kbd>
+      </form>
+      <Link href="/search" aria-label="Search" className="btn-ghost md:hidden">
+        <Icon name="search" />
+      </Link>
+    </>
+  );
+}
+
 /** "+ New": the things staff create most, one click away from anywhere. */
-function NewMenu({ items }: { items: { href: string; label: string }[] }) {
+function NewMenu({ admin }: { admin: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -218,21 +330,26 @@ function NewMenu({ items }: { items: { href: string; label: string }[] }) {
       window.removeEventListener("keydown", onKey);
     };
   }, [open]);
+  const items = [
+    { href: "/work-orders/new", label: "Work order" },
+    { href: "/requests/new", label: "Report a problem" },
+    ...(admin
+      ? [
+          { href: "/assets/new", label: "Equipment (asset)" },
+          { href: "/parts/new", label: "Part" },
+        ]
+      : []),
+  ];
   return (
     <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        className="flex w-full items-center justify-center gap-2 rounded-md bg-sky-600 px-3 py-2 text-sm font-semibold text-white hover:bg-sky-500"
-      >
-        <span aria-hidden="true" className="text-base leading-none">+</span> New
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-haspopup="menu" aria-expanded={open} aria-label="New" className="btn-primary h-8 gap-1 px-2 sm:px-3">
+        <Icon name="plus" className="size-4" />
+        <span className="hidden sm:inline">New</span>
       </button>
       {open && (
-        <div role="menu" className="absolute inset-x-0 z-50 mt-1 overflow-hidden rounded-md bg-white py-1 shadow-lg ring-1 ring-slate-200">
+        <div role="menu" className="absolute right-0 z-50 mt-1 w-52 overflow-hidden rounded-xl bg-white py-1 shadow-lg ring-1 ring-neutral-200">
           {items.map((item) => (
-            <Link key={item.href} role="menuitem" href={item.href} onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
+            <Link key={item.href} role="menuitem" href={item.href} onClick={() => setOpen(false)} className="block px-3 py-2 text-sm text-ink hover:bg-neutral-50">
               {item.label}
             </Link>
           ))}
@@ -243,49 +360,15 @@ function NewMenu({ items }: { items: { href: string; label: string }[] }) {
 }
 
 /** Link to the notifications page, with the unread count. */
-function Bell({ count, className = "" }: { count: number; className?: string }) {
+function Bell({ count }: { count: number }) {
   return (
-    <Link
-      href="/notifications"
-      aria-label={count ? `Notifications, ${count} unread` : "Notifications"}
-      title="Notifications"
-      className={`relative flex items-center rounded-md p-1.5 ${className}`}
-    >
+    <Link href="/notifications" aria-label={count ? `Notifications, ${count} unread` : "Notifications"} title="Notifications" className="btn-ghost">
       <Icon name="bell" />
       {count > 0 && (
-        <span className="absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-red-600 px-1 text-center text-[10px] leading-4 font-semibold text-white">
+        <span className="absolute -top-0.5 -right-0.5 min-w-4 rounded-full bg-red-500 px-1 text-center text-[10px] leading-4 font-semibold text-white">
           {count > 99 ? "99+" : count}
         </span>
       )}
     </Link>
-  );
-}
-
-// Simple outline icons (24×24, stroke).
-const ICONS = {
-  home: "M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z",
-  clipboard: "M9 4h6m-6 0a2 2 0 0 0-2 2H5v15h14V6h-2a2 2 0 0 0-2-2M9 4a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2M8 12h8M8 16h5",
-  user: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8m-7 9a7 7 0 0 1 14 0",
-  calendar: "M4 6h16v15H4zm0 4h16M8 3v4m8-4v4",
-  clock: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18m0-13v5l3 2",
-  repeat: "M4 12a8 8 0 0 1 13.7-5.6L20 9M20 4v5h-5m5 3a8 8 0 0 1-13.7 5.6L4 15m0 5v-5h5",
-  cube: "m12 3 8 4.5v9L12 21l-8-4.5v-9zm0 0v18m8-13.5-8 4.5-8-4.5",
-  inbox: "M4 13h4l2 3h4l2-3h4M4 13l2-8h12l2 8v6a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1z",
-  pin: "M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12m0-9a3 3 0 1 0 0-6 3 3 0 0 0 0 6",
-  alert: "M12 9v4m0 4h.01M10.3 3.9 2.4 17.5A2 2 0 0 0 4.1 20.5h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0",
-  box: "M21 8 12 3 3 8m18 0v8l-9 5m9-13-9 5m0 8-9-5V8m9 13v-8M3 8l9 5",
-  users: "M16 19a4 4 0 0 0-8 0m4-7a3 3 0 1 0 0-6 3 3 0 0 0 0 6m6 7a3 3 0 0 0-2-2.8M17 6.2a3 3 0 0 1 0 5.6M4 19a3 3 0 0 1 2-2.8M7 6.2a3 3 0 0 0 0 5.6",
-  chart: "M4 20h16M7 16v-5m5 5V7m5 9v-8",
-  bell: "M6 16V11a6 6 0 1 1 12 0v5l2 2H4zm4 4a2 2 0 0 0 4 0",
-  list: "M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01",
-  menu: "M4 6h16M4 12h16M4 18h16",
-  close: "M6 6l12 12M18 6 6 18",
-} as const;
-
-function Icon({ name }: { name: keyof typeof ICONS }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className="size-5 shrink-0" aria-hidden="true">
-      <path d={ICONS[name]} />
-    </svg>
   );
 }

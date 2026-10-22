@@ -49,18 +49,18 @@ export default async function PartsPage({ searchParams }: { searchParams: Promis
         <Link
           href={qs({ stock: stock ? undefined : "low" })}
           aria-pressed={!!stock}
-          className={`rounded-full px-3 py-1 text-sm ring-1 ring-inset ${stock ? "bg-amber-500 text-slate-900 ring-amber-500" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}
+          className="chip"
         >
           Low or out of stock{lowCount ? ` (${lowCount})` : ""}
         </Link>
         <Link
           href={qs({ all: all ? undefined : "1" })}
           aria-pressed={!!all}
-          className={`rounded-full px-3 py-1 text-sm ring-1 ring-inset ${all ? "bg-sky-700 text-white ring-sky-700" : "bg-white text-slate-700 ring-slate-300 hover:bg-slate-50"}`}
+          className="chip"
         >
           Show retired
         </Link>
-        <span className="ml-auto text-sm text-slate-500">Stock value {formatMoney(value)}</span>
+        <span className="ml-auto text-sm text-neutral-500">Stock value {formatMoney(value)}</span>
       </div>
       <Card>
         {parts.length === 0 ? (
@@ -85,15 +85,15 @@ export default async function PartsPage({ searchParams }: { searchParams: Promis
                       <Link href={`/parts/${p.id}`} className="link">
                         {p.name}
                       </Link>
-                      <div className="text-xs text-slate-500">{[p.partNumber, p.vendor].filter(Boolean).join(" · ")}</div>
+                      <div className="text-xs text-neutral-500">{[p.partNumber, p.vendor].filter(Boolean).join(" · ")}</div>
                     </td>
                     <td className="font-medium tabular-nums">
-                      {formatQty(p.quantity)} <span className="font-normal text-slate-500">{p.unit}</span>
+                      {formatQty(p.quantity)} <span className="font-normal text-neutral-500">{p.unit}</span>
                     </td>
-                    <td>{p.active ? <StockBadge status={stockStatus(p)} /> : <span className="text-xs text-slate-500">retired</span>}</td>
-                    <td className="tabular-nums text-slate-600">{p.minQuantity == null ? "—" : formatQty(p.minQuantity)}</td>
-                    <td className="text-slate-600">{p.storageLocation ?? "—"}</td>
-                    <td className="tabular-nums text-slate-600">{formatMoney(p.unitCost)}</td>
+                    <td>{p.active ? <StockBadge status={stockStatus(p)} /> : <span className="text-xs text-neutral-500">retired</span>}</td>
+                    <td className="tabular-nums text-neutral-600">{p.minQuantity == null ? "—" : formatQty(p.minQuantity)}</td>
+                    <td className="text-neutral-600">{p.storageLocation ?? "—"}</td>
+                    <td className="tabular-nums text-neutral-600">{formatMoney(p.unitCost)}</td>
                   </tr>
                 ))}
               </tbody>

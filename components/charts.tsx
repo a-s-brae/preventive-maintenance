@@ -1,20 +1,20 @@
-// Small, dependency-free charts for the reports page. Server-rendered divs, so
-// they print, scale to a phone, and need no JavaScript. Exact numbers are in
-// each bar's tooltip and in the table under the charts.
+// Server-rendered charts: plain HTML/SVG that prints, scales to a phone and
+// needs no JavaScript. Colours come from the chart tokens in globals.css.
 
 export interface Series {
   key: string;
   label: string;
-  /** Tailwind background class. */
+  /** CSS colour (a chart token, e.g. "var(--color-chart-1)"). */
   color: string;
 }
 
+/** Legend for bars: a square swatch per series. */
 export function Legend({ series }: { series: Series[] }) {
   return (
-    <ul className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-600">
+    <ul className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-ink" aria-label="Legend">
       {series.map((s) => (
         <li key={s.key} className="flex items-center gap-1.5">
-          <span className={`inline-block size-2.5 rounded-sm ${s.color}`} aria-hidden="true" />
+          <span className="inline-block size-2.5 rounded-sm" style={{ background: s.color }} aria-hidden="true" />
           {s.label}
         </li>
       ))}
@@ -22,120 +22,113 @@ export function Legend({ series }: { series: Series[] }) {
   );
 }
 
-/** A "nice" axis maximum: 1, 2, 5 × 10ⁿ at or above the value. */
-function niceMax(v: number): number {
-  if (v <= 0) return 1;
-  const p = 10 ** Math.floor(Math.log10(v));
-  return ([1, 2, 5, 10].find((m) => m * p >= v) ?? 10) * p;
-}
-
-/** Vertical columns, stacked by series. `max` fixes the scale (e.g. 100 for %). */
-export function ColumnChart({
-  columns,
-  series,
-  max,
-  format = (v) => String(v),
-  emptyText = "Nothing in this range.",
-  showZero = false,
-}: {
-  columns: { label: string; values: Record<string, number | null>; title: string }[];
-  series: Series[];
-  max?: number;
-  format?: (v: number) => string;
-  emptyText?: string;
-  /** Label columns whose value is 0 (e.g. 0% compliance), as opposed to no value. */
-  showZero?: boolean;
-}) {
-  const totals = columns.map((c) => series.reduce((s, x) => s + (c.values[x.key] ?? 0), 0));
-  const top = max ?? niceMax(Math.max(0, ...totals));
-  const hasValue = (c: (typeof columns)[number]) => series.some((s) => c.values[s.key] != null && (showZero || c.values[s.key]! > 0));
-  if (!columns.some(hasValue)) {
-    return <p className="py-10 text-center text-sm text-slate-500">{emptyText}</p>;
-  }
-  // Keep the axis labels readable when there are many columns.
-  const every = Math.ceil(columns.length / 8);
-  return (
-    <div className="flex gap-2">
-      <div className="flex h-40 flex-col justify-between text-right text-[10px] text-slate-400" aria-hidden="true">
-        <span>{format(top)}</span>
-        <span>{format(top / 2)}</span>
-        <span>0</span>
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="relative flex h-40 items-end gap-[3px] border-b border-slate-300">
-          <div className="pointer-events-none absolute inset-x-0 top-0 border-t border-dashed border-slate-200" />
-          <div className="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-slate-200" />
-          {columns.map((c, i) => (
-            <div key={i} title={c.title} className="relative flex h-full min-w-0 flex-1 flex-col-reverse">
-              {series.map((s) => {
-                const v = c.values[s.key];
-                if (!v) return null;
-                return <div key={s.key} className={`${s.color} w-full first:rounded-b-none last:rounded-t-sm`} style={{ height: `${(v / top) * 100}%` }} />;
-              })}
-              {columns.length <= 16 && hasValue(c) && (
-                <span className="absolute inset-x-0 text-center text-[10px] text-slate-500" style={{ bottom: `calc(${(totals[i] / top) * 100}% + 2px)` }}>
-                  {format(totals[i])}
-                </span>
-              )}
-            </div>
-          ))}
-        </div>
-        {/* One label per group of `every` columns, spanning the group, so it has room. */}
-        <div className="mt-1 flex gap-[3px] text-[10px] text-slate-500">
-          {columns
-            .filter((_, i) => i % every === 0)
-            .map((c, g) => (
-              <span key={g} className="min-w-0 truncate" style={{ flex: Math.min(every, columns.length - g * every) }}>
-                {c.label}
-              </span>
-            ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Horizontal bars, one row per item, stacked by series. */
+/** Horizontal bars, one row per item, stacked by series, the total at the end of the row. */
 export function BarList({
   rows,
   series,
-  format = (v) => String(v),
   emptyText = "Nothing in this range.",
 }: {
-  rows: { label: string; href?: string; values: Record<string, number> }[];
+  rows: { label: string; href?: string; values: Record<string, number>; display: string; detail?: string }[];
   series: Series[];
-  format?: (v: number) => string;
   emptyText?: string;
 }) {
   const totals = rows.map((r) => series.reduce((s, x) => s + (r.values[x.key] ?? 0), 0));
   const top = Math.max(0, ...totals);
-  if (top <= 0) return <p className="py-10 text-center text-sm text-slate-500">{emptyText}</p>;
+  if (top <= 0) return <p className="py-10 text-center text-sm text-neutral-500">{emptyText}</p>;
   return (
-    <ul className="space-y-2.5">
+    <ul className="space-y-3">
       {rows.map((r, i) =>
         totals[i] > 0 ? (
           <li key={i} className="text-sm">
-            <div className="mb-0.5 flex justify-between gap-3">
+            <div className="mb-1 flex items-baseline justify-between gap-3">
               {r.href ? (
-                <a href={r.href} className="link truncate">
+                <a href={r.href} className="link truncate font-normal">
                   {r.label}
                 </a>
               ) : (
                 <span className="truncate">{r.label}</span>
               )}
-              <span className="shrink-0 text-slate-600 tabular-nums">{format(totals[i])}</span>
+              <span className="shrink-0 text-ink tabular-nums">{r.display}</span>
             </div>
-            <div
-              className="flex h-2.5 overflow-hidden rounded-sm bg-slate-100"
-              title={series.map((s) => `${s.label}: ${format(r.values[s.key] ?? 0)}`).join(" · ")}
-            >
-              {series.map((s) => (
-                <div key={s.key} className={s.color} style={{ width: `${((r.values[s.key] ?? 0) / top) * 100}%` }} />
-              ))}
+            <div className="flex h-2" title={r.detail}>
+              {/* Segments sit side by side with a 2px gap; the bar's end is rounded. */}
+              <div className="flex overflow-hidden rounded-r" style={{ width: `${(totals[i] / top) * 100}%` }}>
+                {series.map((s) =>
+                  r.values[s.key] ? (
+                    <div key={s.key} className="h-full border-l-2 border-surface first:border-l-0" style={{ flex: r.values[s.key], background: s.color }} />
+                  ) : null,
+                )}
+              </div>
             </div>
+            {r.detail && <div className="sr-only">{r.detail}</div>}
           </li>
         ) : null,
       )}
     </ul>
+  );
+}
+
+export interface Slice {
+  key: string;
+  label: string;
+  value: number;
+  color: string;
+  /** A status needs more than colour: a mark beside its label. */
+  mark?: "check" | "late" | "cross";
+}
+
+const MARK = {
+  check: "m4.5 8.5 2.5 2.5 4.5-5.5",
+  late: "M8 4.5V8l2.5 1.5",
+  cross: "m5 5 6 6m0-6-6 6",
+} as const;
+
+/** Part of a whole at a glance: a ring with a gap between slices, the number in the middle,
+ *  and a legend with counts and shares (the ring is never the only way to read it). */
+export function Donut({ slices, center, centerLabel, emptyText }: { slices: Slice[]; center: string; centerLabel: string; emptyText: string }) {
+  const total = slices.reduce((s, x) => s + x.value, 0);
+  if (total <= 0) return <p className="py-10 text-center text-sm text-neutral-500">{emptyText}</p>;
+  const shown = slices.filter((s) => s.value > 0);
+  const gap = shown.length > 1 ? 1.2 : 0; // in % of the ring
+  let start = 0;
+  return (
+    <div className="flex flex-wrap items-center gap-x-8 gap-y-5">
+      <div className="relative size-36 shrink-0">
+        {/* r = 100 / 2π, so the circumference is 100 and dash lengths are percentages. */}
+        <svg viewBox="0 0 36 36" className="size-full -rotate-90" aria-hidden="true">
+          {shown.map((s) => {
+            const pct = (s.value / total) * 100;
+            const dash = Math.max(0.01, pct - gap);
+            const el = (
+              <circle key={s.key} cx="18" cy="18" r="15.9155" fill="none" stroke={s.color} strokeWidth="5" strokeDasharray={`${dash} ${100 - dash}`} strokeDashoffset={-start}>
+                <title>{`${s.label}: ${s.value} (${Math.round(pct)}%)`}</title>
+              </circle>
+            );
+            start += pct;
+            return el;
+          })}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-xl font-semibold text-ink">{center}</span>
+          <span className="text-xs text-neutral-500">{centerLabel}</span>
+        </div>
+      </div>
+      <ul className="min-w-44 flex-1 space-y-2.5 text-sm">
+        {slices.map((s) => (
+          <li key={s.key} className="flex items-center gap-2">
+            <span className="flex size-4 shrink-0 items-center justify-center rounded-full" style={{ background: s.color }} aria-hidden="true">
+              {s.mark && (
+                <svg viewBox="0 0 16 16" fill="none" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="size-3">
+                  <path d={MARK[s.mark]} />
+                </svg>
+              )}
+            </span>
+            <span className="flex-1 text-ink">{s.label}</span>
+            <span className="text-ink tabular-nums">{s.value}</span>
+            <span className="w-10 text-right text-neutral-500 tabular-nums">{Math.round((s.value / total) * 100)}%</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }

@@ -10,7 +10,7 @@ export default async function NewRequestPage({ searchParams }: { searchParams: P
   return (
     <>
       <PageHeader title="Report a problem" />
-      <p className="-mt-3 mb-6 max-w-2xl text-sm text-slate-600">
+      <p className="-mt-3 mb-6 max-w-2xl text-sm text-neutral-600">
         Tell maintenance what's wrong. Someone will review it and turn it into a work order.
       </p>
       <Card>

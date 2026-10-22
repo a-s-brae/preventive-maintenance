@@ -13,9 +13,9 @@ type Item = { key: string; href: string; label: string; kind: "overdue" | "open"
 
 const KIND_STYLE: Record<Item["kind"], string> = {
   overdue: "bg-red-100 text-red-800",
-  open: "bg-sky-100 text-sky-800",
-  done: "bg-slate-100 text-slate-500 line-through",
-  planned: "border border-dashed border-slate-300 text-slate-600",
+  open: "bg-accent-100 text-accent-800",
+  done: "bg-neutral-100 text-neutral-500 line-through",
+  planned: "border border-dashed border-neutral-300 text-neutral-600",
 };
 
 const dayKey = (d: Date) => d.toISOString().slice(0, 10);
@@ -98,7 +98,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
             Today
           </Link>
         </div>
-        <div className="flex flex-wrap gap-3 text-xs text-slate-600">
+        <div className="flex flex-wrap gap-3 text-xs text-neutral-600">
           {(["overdue", "open", "planned", "done"] as const).map((k) => (
             <span key={k} className="flex items-center gap-1.5">
               <span className={`inline-block h-3 w-5 rounded ${KIND_STYLE[k]}`} />
@@ -111,22 +111,22 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
       <Card>
         {/* Month grid on larger screens */}
         <div className="hidden sm:block">
-          <div className="grid grid-cols-7 border-b border-slate-200 pb-2 text-center text-xs font-medium text-slate-500 uppercase">
+          <div className="grid grid-cols-7 border-b border-neutral-200/70 pb-2 text-center text-xs text-neutral-500">
             {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((d) => (
               <div key={d}>{d}</div>
             ))}
           </div>
           <div className="grid grid-cols-7">
             {Array.from({ length: leading }, (_, i) => (
-              <div key={`blank-${i}`} className="min-h-28 border-r border-b border-slate-100" />
+              <div key={`blank-${i}`} className="min-h-28 border-r border-b border-neutral-200/60" />
             ))}
             {days.map((d) => {
               const items = byDay.get(dayKey(d)) ?? [];
               const isToday = dayKey(d) === todayKey;
               return (
-                <div key={dayKey(d)} className="min-h-28 border-r border-b border-slate-100 p-1">
-                  <div className={`mb-1 text-right text-xs ${isToday ? "font-semibold text-sky-700" : "text-slate-500"}`}>
-                    {isToday ? <span className="rounded-full bg-sky-700 px-1.5 py-0.5 text-white">{d.getUTCDate()}</span> : d.getUTCDate()}
+                <div key={dayKey(d)} className="min-h-28 border-r border-b border-neutral-200/60 p-1">
+                  <div className={`mb-1 text-right text-xs ${isToday ? "font-semibold text-ink" : "text-neutral-500"}`}>
+                    {isToday ? <span className="rounded-full bg-ink px-1.5 py-0.5 text-white">{d.getUTCDate()}</span> : d.getUTCDate()}
                   </div>
                   <div className="space-y-1">
                     {items.slice(0, MAX_PER_DAY).map((it) => (
@@ -134,7 +134,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
                         {it.label}
                       </Link>
                     ))}
-                    {items.length > MAX_PER_DAY && <div className="px-1.5 text-xs text-slate-500">+{items.length - MAX_PER_DAY} more</div>}
+                    {items.length > MAX_PER_DAY && <div className="px-1.5 text-xs text-neutral-500">+{items.length - MAX_PER_DAY} more</div>}
                   </div>
                 </div>
               );
@@ -144,12 +144,12 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
         {/* Agenda on phones */}
         <ul className="space-y-4 sm:hidden">
-          {days.filter((d) => byDay.has(dayKey(d))).length === 0 && <li className="py-6 text-center text-sm text-slate-500">Nothing this month.</li>}
+          {days.filter((d) => byDay.has(dayKey(d))).length === 0 && <li className="py-6 text-center text-sm text-neutral-500">Nothing this month.</li>}
           {days
             .filter((d) => byDay.has(dayKey(d)))
             .map((d) => (
               <li key={dayKey(d)}>
-                <div className={`mb-1 text-sm font-medium ${dayKey(d) === todayKey ? "text-sky-700" : ""}`}>
+                <div className={`mb-1 text-sm font-medium ${dayKey(d) === todayKey ? "font-semibold text-ink" : ""}`}>
                   {d.toLocaleDateString("en-US", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" })}
                 </div>
                 <div className="space-y-1">

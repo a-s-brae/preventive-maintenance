@@ -10,26 +10,26 @@ export function OpenWorkOrderList({ rows, showAsset = true, empty }: { rows: Wor
   if (rows.length === 0) return <Empty>{empty}</Empty>;
   return (
     <>
-      <ul className="divide-y divide-slate-100 sm:hidden">
+      <ul className="divide-y divide-neutral-100 sm:hidden">
         {rows.map((wo) => (
           <li key={wo.id} className="py-3">
             <Link href={`/work-orders/${wo.id}`} className="block">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-neutral-500">
                     {woNumber(wo.number)} · {TYPE_LABEL[wo.type]}
                   </div>
                   <div className="font-medium">{wo.title}</div>
-                  {showAsset && <div className="text-sm text-sky-700">{wo.asset.name}</div>}
+                  {showAsset && <div className="text-sm text-accent-700">{wo.asset.name}</div>}
                 </div>
                 <div className="flex shrink-0 flex-col items-end gap-1">
                   <DueBadge row={wo} />
                   <WoStatusBadge status={wo.status} />
                 </div>
               </div>
-              <div className="mt-1 flex justify-between text-sm text-slate-600">
+              <div className="mt-1 flex flex-wrap justify-between gap-x-3 text-sm text-neutral-600">
                 <WoDueText dueDate={wo.dueDate} dueMeter={wo.dueMeter} daysLeft={wo.due.daysLeft} meterLeft={wo.due.meterLeft} meterUnit={wo.asset.meterUnit} />
-                <span>{userLabel(wo.assignedTo)}</span>
+                <span className="ml-auto">{userLabel(wo.assignedTo)}</span>
               </div>
             </Link>
           </li>
@@ -52,7 +52,7 @@ export function OpenWorkOrderList({ rows, showAsset = true, empty }: { rows: Wor
               <tr key={wo.id}>
                 <td>
                   <DueBadge row={wo} />
-                  <div className="mt-1 text-xs text-slate-600">
+                  <div className="mt-1 text-xs text-neutral-600">
                     <WoDueText dueDate={wo.dueDate} dueMeter={wo.dueMeter} daysLeft={wo.due.daysLeft} meterLeft={wo.due.meterLeft} meterUnit={wo.asset.meterUnit} />
                   </div>
                 </td>
@@ -60,7 +60,7 @@ export function OpenWorkOrderList({ rows, showAsset = true, empty }: { rows: Wor
                   <Link href={`/work-orders/${wo.id}`} className="link">
                     {wo.title}
                   </Link>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-neutral-500">
                     {woNumber(wo.number)} · {TYPE_LABEL[wo.type]}
                   </div>
                 </td>
@@ -69,7 +69,7 @@ export function OpenWorkOrderList({ rows, showAsset = true, empty }: { rows: Wor
                     <Link href={`/assets/${wo.asset.id}`} className="link">
                       {wo.asset.name}
                     </Link>
-                    <div className="text-xs text-slate-500">{wo.asset.location?.name}</div>
+                    <div className="text-xs text-neutral-500">{wo.asset.location?.name}</div>
                   </td>
                 )}
                 <td>
@@ -78,7 +78,7 @@ export function OpenWorkOrderList({ rows, showAsset = true, empty }: { rows: Wor
                 <td>
                   <PriorityText priority={wo.priority} />
                 </td>
-                <td className="text-slate-600">{userLabel(wo.assignedTo)}</td>
+                <td className="text-neutral-600">{userLabel(wo.assignedTo)}</td>
               </tr>
             ))}
           </tbody>
@@ -121,7 +121,7 @@ export function CompletedWorkOrderTable({ rows, showAsset = true }: { rows: Comp
                   <Link href={`/work-orders/${wo.id}`} className="link">
                     {wo.title}
                   </Link>
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-neutral-500">
                     {woNumber(wo.number)} · {TYPE_LABEL[wo.type]}
                   </div>
                 </td>
@@ -132,20 +132,20 @@ export function CompletedWorkOrderTable({ rows, showAsset = true }: { rows: Comp
                     </Link>
                   </td>
                 )}
-                <td className="text-slate-600">{userLabel(wo.completedBy)}</td>
+                <td className="text-neutral-600">{userLabel(wo.completedBy)}</td>
                 <td className="text-xs whitespace-nowrap">
                   {s.total === 0 ? (
-                    <span className="text-slate-400">—</span>
+                    <span className="text-neutral-400">—</span>
                   ) : (
                     <>
-                      <span className={s.answered < s.total ? "text-amber-700" : "text-slate-600"}>
+                      <span className={s.answered < s.total ? "text-amber-700" : "text-neutral-600"}>
                         {s.answered}/{s.total} done
                       </span>
                       {s.failed > 0 && <span className="ml-1 font-medium text-red-700">· {s.failed} {s.failed === 1 ? "problem" : "problems"}</span>}
                     </>
                   )}
                 </td>
-                <td className="max-w-xs whitespace-pre-wrap text-slate-600">{wo.completionNotes ?? ""}</td>
+                <td className="max-w-xs whitespace-pre-wrap text-neutral-600">{wo.completionNotes ?? ""}</td>
               </tr>
             );
           })}

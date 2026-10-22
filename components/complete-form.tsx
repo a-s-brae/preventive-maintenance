@@ -73,12 +73,12 @@ export function CompleteForm({
   return (
     <ActionForm action={action} className="space-y-5">
       {checklist.length > 0 && (
-        <fieldset className="rounded-md border border-slate-200">
+        <fieldset className="rounded-xl border border-neutral-200 bg-white">
           <legend className="ml-3 px-1 text-sm font-medium">Checklist</legend>
           <div className="-mt-1 px-4 pb-1 text-xs" aria-live="polite">
             <SaveIndicator state={saveState} />
           </div>
-          <ul className="divide-y divide-slate-100">
+          <ul className="divide-y divide-neutral-100">
             {checklist.map((item, i) => (
               <ChecklistRow key={i} item={item} index={i} draft={drafts[i]} onSave={onSave} onFlag={onFlag} />
             ))}
@@ -102,7 +102,7 @@ export function CompleteForm({
         <textarea name="notes" rows={4} className="input" placeholder="What was done, parts used, issues found…" />
       </Field>
       {flagged.size > 0 && (
-        <label className="flex items-start gap-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-900 ring-1 ring-red-200">
+        <label className="flex items-start gap-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-900 ring-1 ring-red-200">
           <input type="checkbox" name="followUp" defaultChecked className="mt-0.5 size-4" />
           <span>
             Create a follow-up repair work order for the {flagged.size === 1 ? "problem" : `${flagged.size} problems`} found
@@ -111,7 +111,7 @@ export function CompleteForm({
         </label>
       )}
       {assetDown && (
-        <label className="flex items-center gap-2 rounded-md bg-emerald-50 px-3 py-2 text-sm text-emerald-900 ring-1 ring-emerald-200">
+        <label className="flex items-center gap-2 rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-900 ring-1 ring-emerald-200">
           <input type="checkbox" name="assetUp" defaultChecked className="size-4" />
           The asset is back up and running (ends the downtime)
         </label>
@@ -124,9 +124,9 @@ export function CompleteForm({
 function SaveIndicator({ state }: { state: SaveState }) {
   switch (state.kind) {
     case "idle":
-      return <span className="text-slate-500">Answers save as you go.</span>;
+      return <span className="text-neutral-500">Answers save as you go.</span>;
     case "saving":
-      return <span className="text-slate-500">Saving…</span>;
+      return <span className="text-neutral-500">Saving…</span>;
     case "saved":
       return <span className="text-emerald-700">✓ All answers saved</span>;
     case "error":
@@ -213,12 +213,12 @@ function ChecklistRow({
                 <label key={v} className="cursor-pointer">
                   <input type="radio" name={name} value={v} checked={raw === v} onChange={() => change({ raw: v }, false)} className="peer sr-only" />
                   <span
-                    className={`inline-block rounded-md px-3 py-1 text-xs font-medium ring-1 ring-slate-300 ring-inset peer-focus-visible:ring-2 peer-focus-visible:ring-sky-500 ${
+                    className={`inline-block rounded-lg px-3 py-1 text-xs font-medium ring-1 ring-neutral-300 ring-inset peer-focus-visible:ring-2 peer-focus-visible:ring-accent-500 ${
                       v === "PASS"
                         ? "peer-checked:bg-emerald-600 peer-checked:text-white peer-checked:ring-emerald-600"
                         : v === "FAIL"
                           ? "peer-checked:bg-red-600 peer-checked:text-white peer-checked:ring-red-600"
-                          : "peer-checked:bg-slate-600 peer-checked:text-white peer-checked:ring-slate-600"
+                          : "peer-checked:bg-neutral-600 peer-checked:text-white peer-checked:ring-neutral-600"
                     }`}
                   >
                     {v === "PASS" ? "Pass" : v === "FAIL" ? "Fail" : "N/A"}
@@ -232,7 +232,7 @@ function ChecklistRow({
           <label className="flex min-w-0 flex-1 flex-wrap items-center justify-between gap-2">
             <span>
               {item.label}
-              {describeLimits(item) && <span className="block text-xs text-slate-500">OK: {describeLimits(item)}</span>}
+              {describeLimits(item) && <span className="block text-xs text-neutral-500">OK: {describeLimits(item)}</span>}
             </span>
             <span className="flex flex-wrap items-center justify-end gap-2">
               <input
@@ -245,7 +245,7 @@ function ChecklistRow({
                 aria-invalid={!!outOfLimits}
                 className={`input w-32 ${outOfLimits ? "ring-2 ring-red-500" : ""}`}
               />
-              {item.unit && <span className="text-slate-500">{item.unit}</span>}
+              {item.unit && <span className="text-neutral-500">{item.unit}</span>}
               {outOfLimits && <span className="w-full text-right text-xs font-medium text-red-700">{outOfLimits === "HIGH" ? "Above" : "Below"} limit</span>}
             </span>
           </label>
@@ -257,7 +257,7 @@ function ChecklistRow({
           </label>
         )}
         {!showNote && (
-          <button type="button" onClick={() => setShowNote(true)} className="shrink-0 text-xs text-sky-700 hover:underline">
+          <button type="button" onClick={() => setShowNote(true)} className="shrink-0 text-xs text-accent-700 hover:underline">
             + Note
           </button>
         )}

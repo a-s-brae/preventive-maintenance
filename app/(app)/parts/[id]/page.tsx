@@ -36,13 +36,13 @@ export default async function PartPage({ params }: { params: Promise<{ id: strin
     <>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-sm text-slate-500">
+          <div className="text-sm text-neutral-500">
             <Link href="/parts" className="hover:underline">
               Parts
             </Link>
           </div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight">{part.name}</h1>
-          {part.description && <p className="mt-1 max-w-2xl text-sm text-slate-600">{part.description}</p>}
+          <h1 className="mt-1 text-xl font-semibold">{part.name}</h1>
+          {part.description && <p className="mt-1 max-w-2xl text-sm text-neutral-600">{part.description}</p>}
         </div>
         {can(me.role, "manage") && (
           <ButtonLink href={`/parts/${part.id}/edit`} variant="secondary">
@@ -51,14 +51,14 @@ export default async function PartPage({ params }: { params: Promise<{ id: strin
         )}
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <div className="space-y-6 lg:col-span-2">
+      <div className="grid gap-6 @4xl:grid-cols-3">
+        <div className="space-y-6 @4xl:col-span-2">
           <Card title="Stock">
             <div className="mb-5 flex flex-wrap items-center gap-3">
               <div className="text-3xl font-semibold tabular-nums">
-                {formatQty(part.quantity)} <span className="text-lg font-normal text-slate-500">{part.unit} on hand</span>
+                {formatQty(part.quantity)} <span className="text-lg font-normal text-neutral-500">{part.unit} on hand</span>
               </div>
-              {part.active ? <StockBadge status={status} /> : <span className="text-xs text-slate-500">retired</span>}
+              {part.active ? <StockBadge status={status} /> : <span className="text-xs text-neutral-500">retired</span>}
             </div>
             {can(me.role, "work") && (
               <div className="space-y-4">
@@ -98,14 +98,14 @@ export default async function PartPage({ params }: { params: Promise<{ id: strin
                                 </Link>
                               </>
                             )}
-                            {t.note && <div className="text-xs text-slate-500">{t.note}</div>}
+                            {t.note && <div className="text-xs text-neutral-500">{t.note}</div>}
                           </td>
                           <td className={`tabular-nums ${t.change < 0 ? "text-red-700" : "text-emerald-700"}`}>
                             {t.change > 0 ? "+" : ""}
                             {formatQty(t.change)}
                           </td>
                           <td className="tabular-nums">{formatQty(t.quantityAfter)}</td>
-                          <td className="text-slate-600">{userLabel(t.user)}</td>
+                          <td className="text-neutral-600">{userLabel(t.user)}</td>
                         </tr>
                       );
                     })}
@@ -119,12 +119,12 @@ export default async function PartPage({ params }: { params: Promise<{ id: strin
           <dl className="space-y-2 text-sm">
             {details.map(([k, v]) => (
               <div key={k} className="flex justify-between gap-4">
-                <dt className="text-slate-500">{k}</dt>
+                <dt className="text-neutral-500">{k}</dt>
                 <dd className="text-right">{v ?? "—"}</dd>
               </div>
             ))}
           </dl>
-          {part.notes && <p className="mt-4 text-sm whitespace-pre-wrap text-slate-700">{part.notes}</p>}
+          {part.notes && <p className="mt-4 text-sm whitespace-pre-wrap text-neutral-700">{part.notes}</p>}
         </Card>
       </div>
     </>

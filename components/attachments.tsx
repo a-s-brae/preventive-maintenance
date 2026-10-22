@@ -33,12 +33,12 @@ export function Attachments({
       {photos.length > 0 && (
         <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {photos.map((a) => (
-            <li key={a.id} className="group relative overflow-hidden rounded-md border border-slate-200 bg-slate-50">
+            <li key={a.id} className="group relative overflow-hidden rounded-xl bg-white ring-1 ring-neutral-200/70">
               <a href={`/files/${a.id}`} target="_blank" rel="noreferrer" title={a.fileName}>
                 {/* eslint-disable-next-line @next/next/no-img-element -- served by our own auth-checked route */}
                 <img src={`/files/${a.id}`} alt={a.fileName} loading="lazy" className="aspect-square w-full object-cover" />
               </a>
-              <div className="flex items-center justify-between gap-1 px-2 py-1 text-xs text-slate-500">
+              <div className="flex items-center justify-between gap-1 px-2 py-1 text-xs text-neutral-500">
                 <span className="truncate">
                   {formatDate(a.createdAt)} · {userLabel(a.uploadedBy)}
                 </span>
@@ -53,13 +53,13 @@ export function Attachments({
         </ul>
       )}
       {docs.length > 0 && (
-        <ul className="divide-y divide-slate-100 rounded-md border border-slate-200 text-sm">
+        <ul className="divide-y divide-neutral-100 rounded-xl bg-white text-sm ring-1 ring-neutral-200/70">
           {docs.map((a) => (
             <li key={a.id} className="flex items-center justify-between gap-3 px-3 py-2">
               <a href={`/files/${a.id}`} target="_blank" rel="noreferrer" className="link truncate">
                 📄 {a.fileName}
               </a>
-              <span className="flex shrink-0 items-center gap-3 text-xs text-slate-500">
+              <span className="flex shrink-0 items-center gap-3 text-xs text-neutral-500">
                 {formatBytes(a.size)} · {formatDate(a.createdAt)}
                 {canDelete(a) && (
                   <ConfirmButton action={deleteAttachment.bind(null, a.id)} message="Delete this file?" className="text-red-700 hover:underline">

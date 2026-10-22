@@ -41,22 +41,22 @@ export default async function NotificationsPage() {
       )}
       <Card>
         {items.length === 0 ? (
-          <p className="py-6 text-center text-sm text-slate-500">
+          <p className="py-6 text-center text-sm text-neutral-500">
             Nothing yet. You’ll see work assigned to you, updates on your requests{can(me.role, "review") ? ", new requests and low stock" : ""} here.
           </p>
         ) : (
-          <ul className="-my-2 divide-y divide-slate-100">
+          <ul className="-my-2 divide-y divide-neutral-100">
             {items.map((n) => (
               <li key={n.id}>
-                <a href={`/notifications/${n.id}`} className="-mx-2 flex gap-3 rounded-md px-2 py-3 hover:bg-slate-50">
+                <a href={`/notifications/${n.id}`} className="-mx-2 flex gap-3 rounded-lg px-2 py-3 hover:bg-neutral-50">
                   <span
-                    className={`mt-1.5 size-2 shrink-0 rounded-full ${n.readAt ? "bg-transparent" : "bg-sky-600"}`}
+                    className={`mt-1.5 size-2 shrink-0 rounded-full ${n.readAt ? "bg-transparent" : "bg-accent-600"}`}
                     aria-label={n.readAt ? undefined : "Unread"}
                   />
                   <span className="min-w-0 flex-1">
-                    <span className={`block text-sm ${n.readAt ? "text-slate-700" : "font-semibold text-slate-900"}`}>{n.title}</span>
-                    {n.body && <span className="mt-0.5 block text-sm text-slate-600">{n.body}</span>}
-                    <span className="mt-0.5 block text-xs text-slate-500">{formatDateTime(n.createdAt)}</span>
+                    <span className={`block text-sm ${n.readAt ? "text-neutral-700" : "font-semibold text-neutral-900"}`}>{n.title}</span>
+                    {n.body && <span className="mt-0.5 block text-sm text-neutral-600">{n.body}</span>}
+                    <span className="mt-0.5 block text-xs text-neutral-500">{formatDateTime(n.createdAt)}</span>
                   </span>
                 </a>
               </li>

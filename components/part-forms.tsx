@@ -28,10 +28,10 @@ function QuickForm({ action, children, className }: { action: Action; children: 
 /** Record parts used on a work order. Folded behind a link until needed. */
 export function UsePartForm({ action, parts }: { action: Action; parts: Pick<Part, "id" | "name" | "partNumber" | "quantity" | "unit">[] }) {
   const [open, setOpen] = useState(false);
-  if (parts.length === 0) return <p className="text-sm text-slate-500">No parts in the parts list yet.</p>;
+  if (parts.length === 0) return <p className="text-sm text-neutral-500">No parts in the parts list yet.</p>;
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} className="text-sm font-medium text-sky-700 hover:underline">
+      <button type="button" onClick={() => setOpen(true)} className="text-sm font-medium text-accent-700 hover:underline">
         + Add a part used
       </button>
     );
@@ -39,7 +39,7 @@ export function UsePartForm({ action, parts }: { action: Action; parts: Pick<Par
   return (
     <QuickForm action={action} className="flex flex-wrap items-end gap-2">
       <label className="min-w-0 flex-1">
-        <span className="mb-1 block text-sm font-medium text-slate-700">Use a part</span>
+        <span className="mb-1 block text-sm font-medium text-neutral-700">Use a part</span>
         <select name="partId" required defaultValue="" className="input">
           <option value="" disabled>
             Pick a part…
@@ -53,7 +53,7 @@ export function UsePartForm({ action, parts }: { action: Action; parts: Pick<Par
         </select>
       </label>
       <label>
-        <span className="mb-1 block text-sm font-medium text-slate-700">Qty</span>
+        <span className="mb-1 block text-sm font-medium text-neutral-700">Qty</span>
         <input name="quantity" type="number" step="any" min="0" defaultValue="1" required className="input w-24" />
       </label>
       <SubmitButton className="btn-secondary">Add</SubmitButton>
@@ -68,15 +68,15 @@ export function RestockForm({ action, unit, unitCost }: { action: Action; unit: 
   return (
     <QuickForm action={action} className="flex flex-wrap items-end gap-2">
       <label>
-        <span className="mb-1 block text-sm font-medium text-slate-700">Received ({unit})</span>
+        <span className="mb-1 block text-sm font-medium text-neutral-700">Received ({unit})</span>
         <input name="quantity" type="number" step="any" min="0" required className="input w-28" />
       </label>
       <label>
-        <span className="mb-1 block text-sm font-medium text-slate-700">Unit cost</span>
+        <span className="mb-1 block text-sm font-medium text-neutral-700">Unit cost</span>
         <input name="unitCost" type="number" step="0.01" min="0" defaultValue={unitCost ?? ""} placeholder="$" className="input w-28" />
       </label>
       <label className="min-w-0 flex-1">
-        <span className="mb-1 block text-sm font-medium text-slate-700">Note</span>
+        <span className="mb-1 block text-sm font-medium text-neutral-700">Note</span>
         <input name="note" placeholder="PO / vendor (optional)" className="input" />
       </label>
       <SubmitButton className="btn-primary">Restock</SubmitButton>
@@ -88,11 +88,11 @@ export function CountForm({ action, unit }: { action: Action; unit: string }) {
   return (
     <QuickForm action={action} className="flex flex-wrap items-end gap-2">
       <label>
-        <span className="mb-1 block text-sm font-medium text-slate-700">Counted ({unit})</span>
+        <span className="mb-1 block text-sm font-medium text-neutral-700">Counted ({unit})</span>
         <input name="counted" type="number" step="any" min="0" required className="input w-28" />
       </label>
       <label className="min-w-0 flex-1">
-        <span className="mb-1 block text-sm font-medium text-slate-700">Note</span>
+        <span className="mb-1 block text-sm font-medium text-neutral-700">Note</span>
         <input name="note" placeholder="e.g. Monthly count" className="input" />
       </label>
       <SubmitButton className="btn-secondary">Set count</SubmitButton>

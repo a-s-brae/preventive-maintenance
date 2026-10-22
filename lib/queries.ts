@@ -67,6 +67,69 @@ export async function getNavCounts(userId: string, staff: boolean) {
   };
 }
 
+const person = { select: { id: true, name: true, email: true } } as const;
+type Person = { id: string; name: string | null; email: string } | null;
+
+export interface RailData {
+  notifications: { id: string; title: string; href: string; at: string; read: boolean }[];
+  activity: { id: string; who: { id: string; name: string | null; email: string } | null; text: string; href: string; at: string }[];
+  team: { id: string; name: string | null; email: string; role: "ADMIN" | "TECH" }[];
+}
+
+/** The right-hand panel: your latest notifications, what the team did lately, and who's on it. */
+export async function getRailData(userId: string): Promise<RailData> {
+  const since = new Date(Date.now() - 30 * 86_400_000);
+  const take = 6;
+  const [notifications, completed, created, requests, downs, team] = await Promise.all([
+    db.notification.findMany({ where: { userId }, orderBy: { createdAt: "desc" }, take: 4 }),
+    db.workOrder.findMany({
+      where: { status: "COMPLETE", completedAt: { gte: since } },
+      orderBy: { completedAt: "desc" },
+      take,
+      select: { id: true, title: true, completedAt: true, completedBy: person },
+    }),
+    // Work orders people raised (PM work orders the schedule makes have no creator).
+    db.workOrder.findMany({
+      where: { createdAt: { gte: since }, createdById: { not: null } },
+      orderBy: { createdAt: "desc" },
+      take,
+      select: { id: true, title: true, createdAt: true, createdBy: person },
+    }),
+    db.request.findMany({
+      where: { createdAt: { gte: since } },
+      orderBy: { createdAt: "desc" },
+      take,
+      select: { id: true, title: true, createdAt: true, requestedBy: person },
+    }),
+    db.downtime.findMany({
+      where: { startedAt: { gte: since } },
+      orderBy: { startedAt: "desc" },
+      take,
+      select: { id: true, startedAt: true, asset: { select: { id: true, name: true } }, startedBy: person },
+    }),
+    db.user.findMany({
+      where: { active: true, role: { in: ["ADMIN", "TECH"] } },
+      orderBy: [{ name: "asc" }, { email: "asc" }],
+      take: 8,
+      select: { id: true, name: true, email: true, role: true },
+    }),
+  ]);
+  const item = (id: string, who: Person, text: string, href: string, at: Date) => ({ id, who, text, href, at: at.toISOString() });
+  const activity = [
+    ...completed.map((w) => item(`c${w.id}`, w.completedBy, `Completed “${w.title}”`, `/work-orders/${w.id}`, w.completedAt!)),
+    ...created.map((w) => item(`w${w.id}`, w.createdBy, `Opened “${w.title}”`, `/work-orders/${w.id}`, w.createdAt)),
+    ...requests.map((r) => item(`r${r.id}`, r.requestedBy, `Reported “${r.title}”`, `/requests/${r.id}`, r.createdAt)),
+    ...downs.map((d) => item(`d${d.id}`, d.startedBy, `Marked ${d.asset.name} down`, `/assets/${d.asset.id}`, d.startedAt)),
+  ]
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, take);
+  return {
+    notifications: notifications.map((n) => ({ id: n.id, title: n.title, href: n.href, at: n.createdAt.toISOString(), read: n.readAt != null })),
+    activity,
+    team: team.map((u) => ({ ...u, role: u.role as "ADMIN" | "TECH" })),
+  };
+}
+
 /** All locations as a tree (depth-first, with each one's path). */
 export const getLocationTree = cache(async () => flattenTree(await db.location.findMany({ orderBy: { name: "asc" } })));
 

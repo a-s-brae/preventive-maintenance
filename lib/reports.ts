@@ -215,10 +215,11 @@ export function complianceByBucket(wos: PmWorkOrder[], bs: Bucket[], now: Date) 
   return bs.map((b) => ({ ...b, ...pmCompliance(wos, { from: b.start, to: b.end }, now) }));
 }
 
-/** "1.5 h", "36 h", "12 d"; "—" for null. */
+/** "1.5 h", "36 h", "12 d"; "<0.1 h" for a little (never "0 h" for some); "—" for null. */
 export function formatHours(h: number | null): string {
   if (h == null) return "—";
   if (h >= 72) return `${Math.round(h / 24)} d`;
   if (h >= 10) return `${Math.round(h)} h`;
+  if (h > 0 && h < 0.05) return "<0.1 h";
   return `${Math.round(h * 10) / 10} h`;
 }

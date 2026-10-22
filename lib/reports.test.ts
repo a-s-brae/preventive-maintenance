@@ -79,4 +79,6 @@ it("formats hours", () => {
   expect(formatHours(36.4)).toBe("36 h");
   expect(formatHours(100)).toBe("4 d");
   expect(formatHours(null)).toBe("—");
+  expect(formatHours(0.01)).toBe("<0.1 h");
+  expect(formatHours(0)).toBe("0 h");
 });

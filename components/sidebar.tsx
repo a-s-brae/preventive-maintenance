@@ -104,7 +104,7 @@ export function Sidebar({
   favorites: PageLink[];
   recent: PageLink[];
   user: { id: string; name: string; email: string };
-  signOutAction?: () => Promise<void>;
+  signOutAction: () => Promise<void>;
   /** Shown in the phone drawer. */
   onClose?: () => void;
 }) {
@@ -218,16 +218,14 @@ export function Sidebar({
         <div className="min-w-0 flex-1 text-sm">
           <div className="truncate text-ink">{user.name}</div>
           <div className="truncate text-xs text-neutral-500" title={user.email}>
-            {signOutAction ? user.email : "Signed in with the team password"}
+            {user.email}
           </div>
         </div>
-        {signOutAction && (
-          <form action={signOutAction}>
-            <button type="submit" className="btn-ghost text-neutral-500" aria-label="Sign out" title="Sign out">
-              <Icon name="logout" className="size-[18px]" />
-            </button>
-          </form>
-        )}
+        <form action={signOutAction}>
+          <button type="submit" className="btn-ghost text-neutral-500" aria-label="Sign out" title="Sign out">
+            <Icon name="logout" className="size-[18px]" />
+          </button>
+        </form>
       </div>
     </div>
   );

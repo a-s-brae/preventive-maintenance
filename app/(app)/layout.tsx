@@ -4,7 +4,6 @@ import { can } from "@/lib/permissions";
 import { db } from "@/lib/db";
 import { needsWelcome } from "@/lib/onboarding";
 import { getNavCounts, getRailData } from "@/lib/queries";
-import { teamPassword } from "@/lib/team-password";
 import { AppShell } from "@/components/app-shell";
 import { displayName } from "@/components/avatar";
 import { RightRail } from "@/components/right-rail";
@@ -27,8 +26,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       user={{ id: user.id, name: displayName(user), email: user.email }}
       role={user.role}
       counts={counts}
-      // With a team password the browser holds the sign-in, so there's no signing out.
-      signOutAction={teamPassword() ? undefined : signOutAction}
+      signOutAction={signOutAction}
       rail={rail && <RightRail data={rail} canManagePeople={can(user.role, "people")} />}
       initialSidebar={jar.get("pm-sidebar")?.value !== "closed"}
       initialRail={(["open", "closed"] as const).find((v) => v === jar.get("pm-rail")?.value) ?? "auto"}

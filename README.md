@@ -132,15 +132,15 @@ stay on and awake for others to use it.
 ### Team password instead of email sign-in
 
 While sign-in email isn't working (for example, before your domain is verified in
-Resend), set `TEAM_PASSWORD` in Vercel and redeploy. There's then no sign-in page or
-email: the browser asks for a **username** (your work email) and **password** (the
-team password), and remembers them. Everyone still has their own account — the first
-person in becomes the admin, others start as requesters — so roles and "assigned to
-me" keep working.
+Resend), set `TEAM_PASSWORD` in Vercel and redeploy. The sign-in page then asks for a
+**work email** and the **team password** instead of sending a link (the browser's
+password manager can save them). Everyone still has their own account — the first
+person in becomes the admin, others start as requesters and admins are told — so roles
+and "assigned to me" keep working.
 
 - Use at least 12 characters, e.g. a few words: `belts-and-bearings-friday`.
 - Anyone with the password can sign in as any company address, so keep it to the team.
-- There's no "Sign out": to switch person, close all browser windows (or use a private window).
+- **Sign out** is at the bottom of the sidebar. Deactivating someone on People signs them out everywhere.
 - To go back to email sign-in, delete `TEAM_PASSWORD` and redeploy.
 
 On an empty database the dashboard offers **Load sample equipment** (compressor,
@@ -181,8 +181,8 @@ app/
     assets/import, parts/import   CSV import with preview
   a/[id]                  where QR labels point (asset for staff, report a problem for others)
   print/                  printable work orders, asset history, QR labels
-auth.ts                   Auth.js config + requireUser() / currentUser() (email link or team password)
-proxy.ts                  asks for the team password on every page while TEAM_PASSWORD is set
+auth.ts                   Auth.js config, team password sign-in, requireUser() / currentUser()
+proxy.ts                  notes the page asked for, so signing in comes back to it
 lib/schedule.ts           PM due-date rules (pure, tested)
 lib/work-orders.ts        PM → work order generation, work order due status
 lib/checklist.ts          typed checklist items, reading limits, answers (pure, tested)

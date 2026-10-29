@@ -64,8 +64,7 @@ export function AppShell({
   user: { id: string; name: string; email: string };
   role: Role;
   counts: Counts;
-  /** Absent with team password sign-in, where the browser holds the sign-in. */
-  signOutAction?: () => Promise<void>;
+  signOutAction: () => Promise<void>;
   /** The right-hand panel (staff only). */
   rail?: React.ReactNode;
   initialSidebar: boolean;

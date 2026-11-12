@@ -419,6 +419,7 @@ model User {
 
   accounts Account[]
   sessions Session[]
+  password Password?
   readings MeterReading[]
 
   assignedWorkOrders  WorkOrder[]        @relation("WorkOrderAssignee")
@@ -434,6 +435,16 @@ model User {
   labor               LaborEntry[]
   attachments         Attachment[]
   notifications       Notification[]
+}
+
+/// A person's own sign-in password, as a scrypt hash (lib/passwords.ts). Kept
+/// apart from User so loading a user (and handing it to a page) never loads it.
+model Password {
+  userId    String   @id
+  hash      String
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Account {

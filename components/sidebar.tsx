@@ -215,12 +215,12 @@ export function Sidebar({
 
       <div className="flex items-center gap-2 border-t border-neutral-200/70 px-5 py-4">
         <Avatar name={user.name} seed={user.id} className="size-7 text-[11px]" />
-        <div className="min-w-0 flex-1 text-sm">
+        <Link href="/account" onClick={onClose} className="min-w-0 flex-1 rounded-md text-sm hover:text-accent-800" title="Your account and password">
           <div className="truncate text-ink">{user.name}</div>
           <div className="truncate text-xs text-neutral-500" title={user.email}>
             {user.email}
           </div>
-        </div>
+        </Link>
         <form action={signOutAction}>
           <button type="submit" className="btn-ghost text-neutral-500" aria-label="Sign out" title="Sign out">
             <Icon name="logout" className="size-[18px]" />

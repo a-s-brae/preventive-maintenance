@@ -7,6 +7,10 @@ it("only goes back to pages on this site", () => {
   expect(safeNext("https://evil.example")).toBe("/");
   expect(safeNext("//evil.example")).toBe("/");
   expect(safeNext("/\\evil.example")).toBe("/");
+  expect(safeNext("/\t/evil.example")).toBe("/");
+  expect(safeNext("/\n/evil.example")).toBe("/");
+  expect(safeNext("/\r/evil.example")).toBe("/");
+  expect(safeNext("/a\\..\\evil")).toBe("/");
   expect(safeNext("/login?next=/x")).toBe("/");
   expect(safeNext(undefined)).toBe("/");
   expect(safeNext(42)).toBe("/");

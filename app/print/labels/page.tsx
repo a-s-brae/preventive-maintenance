@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import QRCode from "qrcode";
+import { requirePermission } from "@/auth";
 import { db } from "@/lib/db";
 import { getLocationTree } from "@/lib/queries";
 import { descendantIds, pathLabel } from "@/lib/tree";
@@ -19,6 +20,8 @@ async function baseUrl(): Promise<string> {
  *  ?asset=<id> (repeatable) for chosen assets, ?location=<id> for everything in a
  *  location, nothing for all equipment in service. */
 export default async function LabelsPage({ searchParams }: { searchParams: Promise<{ asset?: string | string[]; location?: string }> }) {
+  // Checked here too: the layout's check isn't guaranteed to run for every render of this page.
+  await requirePermission("view");
   const params = await searchParams;
   const ids = [params.asset ?? []].flat();
   const locations = await getLocationTree();

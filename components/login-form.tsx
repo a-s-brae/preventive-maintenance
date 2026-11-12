@@ -36,7 +36,7 @@ export function LoginForm({ action, localMode, next = "/" }: { action: Action; l
       <input type="hidden" name="next" value={next} />
       <label className="block">
         <span className={label}>Work email</span>
-        <input name="email" type="email" required autoComplete="email" autoFocus placeholder="you@as-plastech.com" className="input py-2.5" />
+        <input name="email" type="email" required autoComplete="email" placeholder="you@as-plastech.com" className="input py-2.5" />
       </label>
       <button type="submit" disabled={busy} className="btn-primary w-full py-2.5">
         {busy ? "Signing in…" : localMode ? "Sign in" : "Email me a sign-in link"}
@@ -45,8 +45,8 @@ export function LoginForm({ action, localMode, next = "/" }: { action: Action; l
   );
 }
 
-/** Sign in with your work email and the team password. */
-export function TeamPasswordForm({ action, next = "/" }: { action: Action; next?: string }) {
+/** Sign in with your work email and your password. */
+export function PasswordForm({ action, next = "/" }: { action: Action; next?: string }) {
   const { state, pending, onSubmit } = useLoginAction(action);
   const [show, setShow] = useState(false);
   return (
@@ -58,12 +58,12 @@ export function TeamPasswordForm({ action, next = "/" }: { action: Action; next?
         <input name="email" type="email" required autoComplete="username" autoFocus placeholder="you@as-plastech.com" className="input py-2.5" />
       </label>
       <div>
-        <label htmlFor="team-password" className={label}>
-          Team password
+        <label htmlFor="password" className={label}>
+          Password
         </label>
         <div className="relative">
           <input
-            id="team-password"
+            id="password"
             name="password"
             type={show ? "text" : "password"}
             required

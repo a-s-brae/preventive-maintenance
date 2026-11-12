@@ -31,12 +31,14 @@ const team = teamPassword(env);
 if (team && team.length < TEAM_PASSWORD_MIN_LENGTH) {
   problems.push(`TEAM_PASSWORD is too short: use at least ${TEAM_PASSWORD_MIN_LENGTH} characters, e.g. a few words like "belts-and-bearings-friday".`);
 }
-if (!env.AUTH_RESEND_KEY?.trim()) {
+if (team) {
   warnings.push(
-    team
-      ? "AUTH_RESEND_KEY is missing: the daily email can't be sent."
-      : "AUTH_RESEND_KEY is missing: sign-in emails can't be sent, so nobody can sign in yet.",
+    "TEAM_PASSWORD is still set: anyone who knows it can sign in as any account that has no password of its own yet. " +
+      "Once everyone has their own password (People page), delete TEAM_PASSWORD and redeploy.",
   );
+}
+if (!env.AUTH_RESEND_KEY?.trim()) {
+  warnings.push("AUTH_RESEND_KEY is missing: the daily email and email sign-in links can't be sent (password sign-in still works).");
 }
 if (!env.EMAIL_FROM?.trim()) {
   warnings.push("EMAIL_FROM is missing: emails come from Resend's test sender, which only delivers to your own Resend account's address.");
@@ -49,7 +51,6 @@ if (db) {
   console.log(`  ✓ Migrations connect with: ${db.directFrom}`);
 }
 if (!problems.some((p) => p.startsWith("AUTH_SECRET"))) console.log("  ✓ AUTH_SECRET");
-if (team && team.length >= TEAM_PASSWORD_MIN_LENGTH) console.log("  ✓ Sign-in: team password (remove TEAM_PASSWORD to go back to email sign-in)");
 for (const w of warnings) console.log(`  ! ${w}`);
 if (problems.length) {
   for (const p of problems) console.error(`  ✗ ${p}`);

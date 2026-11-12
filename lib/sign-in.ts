@@ -2,7 +2,9 @@
 
 /** A path on this site to go to after signing in; anything else goes home. */
 export function safeNext(v: unknown): string {
-  return typeof v === "string" && /^\/(?![/\\])/.test(v) && !v.startsWith("/login") ? v : "/";
+  // No control characters or backslashes anywhere: browsers drop tabs and
+  // newlines from URLs, so "/\t/evil.example" would become "//evil.example".
+  return typeof v === "string" && /^\/(?![/\\])/.test(v) && !/[\x00-\x1f\x7f\\]/.test(v) && !v.startsWith("/login") ? v : "/";
 }
 
 /** The sign-in page, coming back to `path` afterwards. */

@@ -1,10 +1,7 @@
-// Team password sign-in: while TEAM_PASSWORD is set, people sign in on the
-// sign-in page with their work email and one shared password, instead of an
-// emailed link. A stopgap for when sign-in email isn't working: remove
-// TEAM_PASSWORD to go back to email.
-//
-// Anyone who knows the password can sign in as any company address, so keep
-// it to the team. auth.ts checks it and starts the session.
+// Team password: being phased out in favour of each person's own password
+// (lib/passwords.ts). While TEAM_PASSWORD is still set, it only opens accounts
+// that don't have their own password yet (auth.ts signInWithPassword), so
+// everyone can get in once to set one. Remove TEAM_PASSWORD once they have.
 
 export const TEAM_PASSWORD_MIN_LENGTH = 12;
 

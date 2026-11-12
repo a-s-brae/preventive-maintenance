@@ -2,6 +2,16 @@ import { z } from "zod";
 
 export type FormState = { error?: string } | undefined;
 
+export const PASSWORD_MIN_LENGTH = 10;
+export const PASSWORD_MAX_LENGTH = 200;
+
+/** Why this can't be someone's password, or null if it's fine. */
+export function passwordProblem(password: string): string | null {
+  if (password.length < PASSWORD_MIN_LENGTH) return `Use at least ${PASSWORD_MIN_LENGTH} characters.`;
+  if (password.length > PASSWORD_MAX_LENGTH) return `Use at most ${PASSWORD_MAX_LENGTH} characters.`;
+  return null;
+}
+
 // FormData gives "" for empty inputs; treat that as "not provided".
 const blankToUndef = (v: unknown) => (typeof v === "string" && v.trim() === "" ? undefined : v);
 

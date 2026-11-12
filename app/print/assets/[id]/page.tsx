@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { requirePermission } from "@/auth";
 import { db } from "@/lib/db";
 import { parseResults, summarize } from "@/lib/checklist";
 import { downtimeHours, formatDateTime, formatDuration } from "@/lib/downtime";
@@ -18,6 +19,8 @@ const parseDay = (s: string | undefined, fallback: Date) => (s && /^\d{4}-\d{2}-
 
 /** An asset's maintenance history for a date range — for audits. */
 export default async function PrintAssetHistory({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ from?: string; to?: string }> }) {
+  // Checked here too: the layout's check isn't guaranteed to run for every render of this page.
+  await requirePermission("view");
   const [{ id }, sp] = await Promise.all([params, searchParams]);
   const now = new Date();
   const to = parseDay(sp.to, now);

@@ -44,7 +44,7 @@ computer (`npm run local`) or hosted on Vercel.
 | **Reports** | Pick a date range (30 / 90 days, 12 months, this year, or custom). KPIs: **PM compliance** (done by the due date), work orders done / open / overdue, **downtime**, **MTTR / MTBF**, and **maintenance cost** (parts, plus labor at an hourly rate you enter). Charts of work done by type, compliance over time, downtime and cost by asset, and a per-asset table with CSV export. |
 | **QR labels** | Print 2″ × 4″ labels (Avery 5163) for one asset, a location or all equipment. Scanning opens the asset for staff, and **Report a problem** with the asset filled in for everyone else (after sign-in if needed). |
 | **Daily email** | Each weekday morning, techs and admins get their overdue / due-soon work orders, and admins a plant summary. Needs email set up (hosted only); preview it on the People page. |
-| **Sign-in** | Email magic link, restricted to `ALLOWED_EMAIL_DOMAINS` (default `as-plastech.com`). In local mode, sign-in skips the email step. Until email works, a shared **team password** can be used instead (below). |
+| **Sign-in** | Work email and **your own password**, restricted to `ALLOWED_EMAIL_DOMAINS` (default `as-plastech.com`). Admins add people and set or reset passwords on the **People** page; everyone changes their own on **Account** (click your name in the sidebar). Where email is set up, an emailed sign-in link works too. In local mode, sign-in can skip the email step. |
 
 The due-date rules ([`lib/schedule.ts`](lib/schedule.ts)), work order due status
 ([`lib/work-orders.ts`](lib/work-orders.ts)) and checklist handling
@@ -127,21 +127,27 @@ stay on and awake for others to use it.
    missing, the build log lists what to add, under *PM System — checking settings*.
    After changing environment variables, redeploy (*Deployments → ⋯ → Redeploy*):
    Vercel only reads them when it builds.
-6. Open the site, sign in with your company email, and add your first asset.
+6. Open the site, sign in with your company email (the first person in becomes the
+   admin), set your password on **Account**, and add your first asset.
 
-### Team password instead of email sign-in
+### Passwords
 
-While sign-in email isn't working (for example, before your domain is verified in
-Resend), set `TEAM_PASSWORD` in Vercel and redeploy. The sign-in page then asks for a
-**work email** and the **team password** instead of sending a link (the browser's
-password manager can save them). Everyone still has their own account — the first
-person in becomes the admin, others start as requesters and admins are told — so roles
-and "assigned to me" keep working.
+Everyone signs in with their work email and their own password. Passwords are
+stored as salted scrypt hashes in their own table, never with the user record.
 
-- Use at least 12 characters, e.g. a few words: `belts-and-bearings-friday`.
-- Anyone with the password can sign in as any company address, so keep it to the team.
-- **Sign out** is at the bottom of the sidebar. Deactivating someone on People signs them out everywhere.
-- To go back to email sign-in, delete `TEAM_PASSWORD` and redeploy.
+- **Adding someone:** People → *Add a person*, with a starting password. Tell them
+  the password; they change it on **Account** (click their name in the sidebar).
+- **Forgotten password:** an admin sets a new one on their row on People. Setting
+  someone's password signs them out everywhere.
+- **Leaving:** untick *Active* on People. That signs them out everywhere and
+  blocks sign-in.
+- Passwords need at least 10 characters. A few words together is easy to remember.
+
+**Switching from the old shared team password:** while `TEAM_PASSWORD` is still
+set, an account with no password of its own also accepts the team password, so
+people can get in once to set theirs. Once everyone has their own (People shows
+*No password yet* next to anyone who doesn't), delete `TEAM_PASSWORD` in Vercel and
+redeploy. The build log warns while it's still set.
 
 On an empty database the dashboard offers **Load sample equipment** (compressor,
 forklift, HVAC, extinguishers) so you can try it out before entering real assets.
@@ -165,7 +171,8 @@ the new folder in `prisma/migrations/`.
 
 ```
 app/
-  login/                  magic-link sign-in + "check your email"
+  login/                  password sign-in (+ email link where email is set up)
+  (app)/account/          change your own password
   (app)/                  everything behind sign-in
     page.tsx              dashboard: KPI tiles, trend and equipment charts, what needs attention
     work-orders/          list, new, [id] detail + complete, [id]/edit, calendar
@@ -181,7 +188,8 @@ app/
     assets/import, parts/import   CSV import with preview
   a/[id]                  where QR labels point (asset for staff, report a problem for others)
   print/                  printable work orders, asset history, QR labels
-auth.ts                   Auth.js config, team password sign-in, requireUser() / currentUser()
+auth.ts                   Auth.js config, password sign-in, requireUser() / currentUser()
+lib/passwords.ts          password hashing (scrypt) and checking
 proxy.ts                  notes the page asked for, so signing in comes back to it
 lib/schedule.ts           PM due-date rules (pure, tested)
 lib/work-orders.ts        PM → work order generation, work order due status

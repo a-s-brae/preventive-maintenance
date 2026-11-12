@@ -1,11 +1,11 @@
 import { redirect } from "next/navigation";
 import { AuthError } from "next-auth";
-import { currentUser, isAllowedEmail, localLogin, signIn, signInWithTeamPassword, takeLocalLink, type TeamSignIn } from "@/auth";
+import { currentUser, isAllowedEmail, localLogin, signIn, signInWithPassword, takeLocalLink, type PasswordSignIn } from "@/auth";
 import { Icon, type IconName } from "@/components/icons";
-import { LoginForm, TeamPasswordForm, type LoginState } from "@/components/login-form";
+import { LoginForm, PasswordForm, type LoginState } from "@/components/login-form";
 import { db } from "@/lib/db";
+import { emailConfigured } from "@/lib/mailer";
 import { safeNext } from "@/lib/sign-in";
-import { teamPassword } from "@/lib/team-password";
 import { ORG_NAME } from "../print/print-parts";
 
 const ERRORS: Record<string, string> = {
@@ -17,10 +17,9 @@ const ERRORS: Record<string, string> = {
 };
 const GENERIC_ERROR = "Sign-in failed. Please try again.";
 
-const TEAM_ERRORS: Record<Exclude<TeamSignIn, { ok: true }>["error"], string> = {
-  off: "Team password sign-in is turned off. Reload the page to sign in by email.",
+const PASSWORD_ERRORS: Record<Exclude<PasswordSignIn, { ok: true }>["error"], string> = {
   email: ERRORS.AccessDenied,
-  password: "That's not the team password. Check it with your maintenance supervisor.",
+  password: "That email and password don't match. Forgot your password? Ask an admin to reset it.",
   deactivated: ERRORS.Deactivated,
 };
 
@@ -28,12 +27,13 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   const { error, next: nextParam } = await searchParams;
   const next = safeNext(nextParam);
   if (await currentUser()) redirect(next);
-  const team = !!teamPassword();
+  // The email-link way in, where there's email (or local mode, which skips it).
+  const emailLink = localLogin || emailConfigured();
 
-  async function teamSignIn(_prev: LoginState, fd: FormData): Promise<LoginState> {
+  async function passwordSignIn(_prev: LoginState, fd: FormData): Promise<LoginState> {
     "use server";
-    const result = await signInWithTeamPassword(String(fd.get("email") ?? ""), String(fd.get("password") ?? ""));
-    if ("error" in result) return { error: TEAM_ERRORS[result.error] };
+    const result = await signInWithPassword(String(fd.get("email") ?? ""), String(fd.get("password") ?? ""));
+    if ("error" in result) return { error: PASSWORD_ERRORS[result.error] };
     redirect(safeNext(fd.get("next")));
   }
 
@@ -65,23 +65,22 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
         <div className="w-full max-w-sm">
           <Mark className="mb-10 lg:hidden" />
           <h1 className="text-xl font-semibold text-ink">Sign in</h1>
-          <p className="mt-1 mb-6 text-sm text-neutral-600">
-            {team
-              ? "Use your work email and the team password."
-              : localLogin
-                ? "Sign in with your work email."
-                : "Enter your work email and we'll send you a sign-in link."}
-          </p>
-          {localLogin && !team && (
-            <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">
-              Local mode: no email check. Anyone who can open this page can sign in with any company address.
-            </p>
-          )}
+          <p className="mt-1 mb-6 text-sm text-neutral-600">Use your work email and your password.</p>
           {error && <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200">{ERRORS[error] ?? GENERIC_ERROR}</p>}
-          {team ? <TeamPasswordForm action={teamSignIn} next={next} /> : <LoginForm action={requestSignIn} localMode={localLogin} next={next} />}
+          <PasswordForm action={passwordSignIn} next={next} />
+          {emailLink && (
+            <div className="mt-8 border-t border-neutral-200/70 pt-6">
+              <p className="mb-3 text-sm text-neutral-600">{localLogin ? "Or sign in without a password:" : "Or get a sign-in link by email:"}</p>
+              {localLogin && (
+                <p className="mb-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800 ring-1 ring-amber-200">
+                  Local mode: no email check. Anyone who can open this page can sign in with any company address.
+                </p>
+              )}
+              <LoginForm action={requestSignIn} localMode={localLogin} next={next} />
+            </div>
+          )}
           <div className="mt-8 space-y-2 border-t border-neutral-200/70 pt-6 text-sm text-neutral-600">
-            {team && <p>Don&apos;t have the team password? Ask your maintenance supervisor.</p>}
-            <p>First time here? Signing in sets up your account. You can report problems straight away; an admin gives maintenance staff access to the rest.</p>
+            <p>No password yet, or forgot it? Ask your maintenance supervisor (an admin) to set one for you.</p>
           </div>
         </div>
       </section>

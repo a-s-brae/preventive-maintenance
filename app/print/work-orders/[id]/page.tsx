@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { requirePermission } from "@/auth";
 import { db } from "@/lib/db";
 import { formatValue, parseResults } from "@/lib/checklist";
 import { formatDateTime, requestNumber } from "@/lib/downtime";
@@ -15,6 +16,8 @@ import { Fields, PrintHeader, Section } from "../../print-parts";
 export const dynamic = "force-dynamic";
 
 export default async function PrintWorkOrder({ params }: { params: Promise<{ id: string }> }) {
+  // Checked here too: the layout's check isn't guaranteed to run for every render of this page.
+  await requirePermission("view");
   const { id } = await params;
   const wo = await db.workOrder.findUnique({
     where: { id },

@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import type { Prisma } from "@prisma/client";
 import { requirePermission, requireUser } from "@/auth";
 import { db } from "@/lib/db";
+import { isAllowedEmail } from "@/lib/email-domains";
+import { hashPassword, verifyPassword } from "@/lib/passwords";
 import { checklistFromForm, draftAnswers, findProblems, NOTE_MAX, parseAnswer, parseChecklist, resultsFromForm, type ChecklistResult } from "@/lib/checklist";
 import { endDowntime, startDowntime } from "@/lib/downtime";
 import { headers } from "next/headers";
@@ -25,6 +27,7 @@ import {
   firstError,
   locationSchema,
   optNumber,
+  passwordProblem,
   rejectSchema,
   requestSchema,
   taskSchema,
@@ -239,6 +242,9 @@ function notifyAssigned(tx: Tx, wo: { id: string; number: number; title: string;
 
 export async function setWorkOrderStatus(workOrderId: string, status: "OPEN" | "IN_PROGRESS" | "ON_HOLD") {
   await requirePermission("work");
+  // The type above isn't checked at runtime and actions can be called with any
+  // arguments; completing goes through completeWorkOrder, which frees the PM slot.
+  if (!["OPEN", "IN_PROGRESS", "ON_HOLD"].includes(status)) return;
   const wo = await db.workOrder.findUniqueOrThrow({ where: { id: workOrderId } });
   if (wo.status === "COMPLETE") return;
   await db.workOrder.update({
@@ -726,6 +732,59 @@ export async function updatePerson(userId: string, _prev: FormState, fd: FormDat
   // Someone who just took away their own admin role can't stay on the people page.
   if (userId === me.id && role !== "ADMIN") redirect("/");
   return {};
+}
+
+/** Add someone with a starting password, which the admin passes on to them
+ *  and they change on their Account page. */
+export async function addPerson(_prev: FormState, fd: FormData): Promise<FormState> {
+  await requirePermission("people");
+  const email = String(fd.get("email") ?? "").trim().toLowerCase();
+  if (!isAllowedEmail(email)) return { error: "Use a company email address." };
+  const role = String(fd.get("role") ?? "");
+  if (role !== "ADMIN" && role !== "TECH" && role !== "REQUESTER") return { error: "Pick a role" };
+  const name = String(fd.get("name") ?? "").trim().slice(0, 100) || null;
+  const password = String(fd.get("password") ?? "");
+  const problem = passwordProblem(password);
+  if (problem) return { error: `Starting password: ${problem}` };
+  const hash = await hashPassword(password);
+  try {
+    await db.user.create({ data: { email, name, role, password: { create: { hash } } } });
+  } catch (e) {
+    if (isUniqueViolation(e)) return { error: "That person is already here. Set their password on their row below." };
+    throw e;
+  }
+  revalidatePath("/people");
+  redirect("/people?added=1");
+}
+
+/** An admin sets (or resets) someone's password. They're signed out everywhere,
+ *  so the old password, and anyone still using it, stops working. */
+export async function setPersonPassword(userId: string, _prev: FormState, fd: FormData): Promise<FormState> {
+  const me = await requirePermission("people");
+  const password = String(fd.get("password") ?? "");
+  const problem = passwordProblem(password);
+  if (problem) return { error: problem };
+  const hash = await hashPassword(password);
+  await db.password.upsert({ where: { userId }, create: { userId, hash }, update: { hash } });
+  if (userId !== me.id) await db.session.deleteMany({ where: { userId } });
+  revalidatePath("/people");
+  redirect("/people?passwordSet=1");
+}
+
+/** Change your own password. Needs the current one, if you have one. */
+export async function changeMyPassword(_prev: FormState, fd: FormData): Promise<FormState> {
+  const me = await requireUser();
+  const current = await db.password.findUnique({ where: { userId: me.id } });
+  if (current && !(await verifyPassword(String(fd.get("current") ?? ""), current.hash))) {
+    return { error: "Your current password isn't right." };
+  }
+  const password = String(fd.get("password") ?? "");
+  const problem = passwordProblem(password);
+  if (problem) return { error: problem };
+  if (password !== String(fd.get("confirm") ?? "")) return { error: "The two new passwords don't match." };
+  const hash = await hashPassword(password);
+  await db.password.upsert({ where: { userId: me.id }, create: { userId: me.id, hash }, update: { hash } });
+  redirect("/account?changed=1");
 }
 
 // ─── Onboarding ─────────────────────────────────────────────────────────────

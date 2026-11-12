@@ -9,6 +9,7 @@ import { db } from "@/lib/db";
 import { isAllowedEmail } from "@/lib/email-domains";
 import { notifyNewPerson } from "@/lib/notify";
 import { can, type Permission } from "@/lib/permissions";
+import { verifyAgainstDecoy, verifyPassword } from "@/lib/passwords";
 import { loginHref } from "@/lib/sign-in";
 import { passwordMatches, teamPassword } from "@/lib/team-password";
 
@@ -72,47 +73,38 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 export type SessionUser = { id: string; email: string; name?: string | null; role: Role };
 type CurrentUser = SessionUser & { active?: boolean };
 
-export type TeamSignIn = { ok: true } | { error: "off" | "email" | "password" | "deactivated" };
+export type PasswordSignIn = { ok: true } | { error: "email" | "password" | "deactivated" };
 
-/** Team password sign-in (lib/team-password.ts), from the sign-in page: check
- *  the password, find or make the person's account, and start their session —
- *  the same kind an email link starts, so signing out works the same. The very
- *  first person becomes the admin, as with email sign-in; after that, admins
- *  are told someone new is here. */
-export async function signInWithTeamPassword(rawEmail: string, password: string): Promise<TeamSignIn> {
-  const expected = teamPassword();
-  if (!expected) return { error: "off" };
+/** Password sign-in, from the sign-in page: check the person's own password
+ *  (lib/passwords.ts) and start their session — the same kind an email link
+ *  starts, so signing out works the same. Accounts aren't made here: an admin
+ *  adds people on the People page.
+ *
+ *  Switch-over: while TEAM_PASSWORD is still set, an account that has no
+ *  password of its own yet also accepts the team password, so people (and the
+ *  admin setting everyone up) can get in to set one. Remove TEAM_PASSWORD once
+ *  everyone has their own. */
+export async function signInWithPassword(rawEmail: string, password: string): Promise<PasswordSignIn> {
   const email = rawEmail.trim().toLowerCase();
   if (!isAllowedEmail(email)) return { error: "email" };
-  if (!passwordMatches(password, expected)) {
-    // A pause makes guessing slow.
+  const user = await db.user.findUnique({ where: { email }, select: { id: true, active: true, password: { select: { hash: true } } } });
+  const team = teamPassword();
+  const ok = user?.password
+    ? await verifyPassword(password, user.password.hash)
+    : user && team
+      ? passwordMatches(password, team)
+      : await verifyAgainstDecoy(password);
+  if (!user || !ok) {
+    // A pause makes guessing slow. Same answer whether or not the account exists.
     await new Promise((r) => setTimeout(r, 750));
     return { error: "password" };
   }
-  const user = await findOrCreateUser(email);
   if (!user.active) return { error: "deactivated" };
   const sessionToken = randomBytes(32).toString("base64url");
   const expires = new Date(Date.now() + SESSION_DAYS * 86_400_000);
   await db.session.create({ data: { sessionToken, userId: user.id, expires } });
   (await cookies()).set(SESSION_COOKIE, sessionToken, { httpOnly: true, sameSite: "lax", path: "/", secure: secureCookies, expires });
   return { ok: true };
-}
-
-async function findOrCreateUser(email: string) {
-  const select = { id: true, active: true } as const;
-  const existing = await db.user.findUnique({ where: { email }, select });
-  if (existing) return existing;
-  try {
-    const first = (await db.user.count()) === 0;
-    const created = await db.user.create({ data: { email, role: first ? "ADMIN" : "REQUESTER" }, select });
-    if (!first) await notifyNewPerson(db, email);
-    return created;
-  } catch (e) {
-    // Signed in twice at once: the other one made it.
-    const created = await db.user.findUnique({ where: { email }, select });
-    if (created) return created;
-    throw e;
-  }
 }
 
 /** The signed-in person, or null. Route handlers use this; pages and actions use requireUser. */

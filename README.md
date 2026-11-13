@@ -142,6 +142,9 @@ stored as salted scrypt hashes in their own table, never with the user record.
 - **Leaving:** untick *Active* on People. That signs them out everywhere and
   blocks sign-in.
 - Passwords need at least 10 characters. A few words together is easy to remember.
+- **Too many wrong passwords:** after 5 for one email (or 30 from one network
+  address) within 15 minutes, sign-in waits 15 minutes. An admin setting a new
+  password lifts the wait straight away.
 
 **Switching from the old shared team password:** while `TEAM_PASSWORD` is still
 set, an account with no password of its own also accepts the team password, so

@@ -44,6 +44,9 @@ if (!env.EMAIL_FROM?.trim()) {
   warnings.push("EMAIL_FROM is missing: emails come from Resend's test sender, which only delivers to your own Resend account's address.");
 }
 if (!env.CRON_SECRET?.trim()) warnings.push("CRON_SECRET is missing: the daily email won't be sent.");
+if (!env.APP_URL?.trim()) {
+  warnings.push("APP_URL is missing: links in emails and on QR labels use Vercel's default address. Set it to the address people use.");
+}
 
 console.log(`\nPM System — checking settings${scope}`);
 if (db) {

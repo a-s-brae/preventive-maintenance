@@ -447,6 +447,17 @@ model Password {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+/// A wrong password, counted by email and by network address so guessing has
+/// to wait (lib/sign-in-limits.ts). Old rows are cleared as new ones come in.
+model SignInFailure {
+  id        String   @id @default(cuid())
+  /// "email:<address>" or "ip:<address>"
+  key       String
+  createdAt DateTime @default(now())
+
+  @@index([key, createdAt])
+}
+
 model Account {
   userId            String
   type              String

@@ -1,5 +1,5 @@
-import { headers } from "next/headers";
 import { requirePermission } from "@/auth";
+import { appUrl } from "@/lib/app-url";
 import { buildDigest, gatherDigests } from "@/lib/digest";
 import { Card, Empty, PageHeader } from "@/components/ui";
 
@@ -8,9 +8,7 @@ export const dynamic = "force-dynamic";
 /** What each person's daily email would say right now. */
 export default async function DigestPreviewPage() {
   await requirePermission("people");
-  const h = await headers();
-  const base = process.env.APP_URL ?? `${h.get("x-forwarded-proto") ?? "http"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
-  const digests = (await gatherDigests(base)).map((d) => ({ ...d, msg: buildDigest(d.input) }));
+  const digests = (await gatherDigests(await appUrl())).map((d) => ({ ...d, msg: buildDigest(d.input) }));
   return (
     <>
       <PageHeader title="Daily email preview" />

@@ -21,6 +21,7 @@ const PASSWORD_ERRORS: Record<Exclude<PasswordSignIn, { ok: true }>["error"], st
   email: ERRORS.AccessDenied,
   password: "That email and password don't match. Forgot your password? Ask an admin to reset it.",
   deactivated: ERRORS.Deactivated,
+  locked: "Too many wrong passwords. Wait 15 minutes and try again, or ask an admin to reset your password.",
 };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; next?: string }> }) {

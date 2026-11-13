@@ -10,6 +10,7 @@ import { isAllowedEmail } from "@/lib/email-domains";
 import { notifyNewPerson } from "@/lib/notify";
 import { can, type Permission } from "@/lib/permissions";
 import { verifyAgainstDecoy, verifyPassword } from "@/lib/passwords";
+import { clientIp, emailKey, ipKey, isLimited, WINDOW_MINUTES } from "@/lib/sign-in-limits";
 import { loginHref } from "@/lib/sign-in";
 import { passwordMatches, teamPassword } from "@/lib/team-password";
 
@@ -73,7 +74,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 export type SessionUser = { id: string; email: string; name?: string | null; role: Role };
 type CurrentUser = SessionUser & { active?: boolean };
 
-export type PasswordSignIn = { ok: true } | { error: "email" | "password" | "deactivated" };
+export type PasswordSignIn = { ok: true } | { error: "email" | "password" | "deactivated" | "locked" };
 
 /** Password sign-in, from the sign-in page: check the person's own password
  *  (lib/passwords.ts) and start their session — the same kind an email link
@@ -87,6 +88,14 @@ export type PasswordSignIn = { ok: true } | { error: "email" | "password" | "dea
 export async function signInWithPassword(rawEmail: string, password: string): Promise<PasswordSignIn> {
   const email = rawEmail.trim().toLowerCase();
   if (!isAllowedEmail(email)) return { error: "email" };
+  // Too many wrong passwords lately, for this email or from this address: wait.
+  const keys = { email: emailKey(email), ip: ipKey(clientIp(await headers())) };
+  const since = new Date(Date.now() - WINDOW_MINUTES * 60_000);
+  const [emailMisses, ipMisses] = await Promise.all([
+    db.signInFailure.count({ where: { key: keys.email, createdAt: { gte: since } } }),
+    db.signInFailure.count({ where: { key: keys.ip, createdAt: { gte: since } } }),
+  ]);
+  if (isLimited({ email: emailMisses, ip: ipMisses })) return { error: "locked" };
   const user = await db.user.findUnique({ where: { email }, select: { id: true, active: true, password: { select: { hash: true } } } });
   const team = teamPassword();
   const ok = user?.password
@@ -95,11 +104,15 @@ export async function signInWithPassword(rawEmail: string, password: string): Pr
       ? passwordMatches(password, team)
       : await verifyAgainstDecoy(password);
   if (!user || !ok) {
+    await db.signInFailure.createMany({ data: [{ key: keys.email }, { key: keys.ip }] });
+    // Clear out misses old enough not to count any more.
+    await db.signInFailure.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 86_400_000) } } });
     // A pause makes guessing slow. Same answer whether or not the account exists.
     await new Promise((r) => setTimeout(r, 750));
     return { error: "password" };
   }
   if (!user.active) return { error: "deactivated" };
+  await db.signInFailure.deleteMany({ where: { key: keys.email } });
   const sessionToken = randomBytes(32).toString("base64url");
   const expires = new Date(Date.now() + SESSION_DAYS * 86_400_000);
   await db.session.create({ data: { sessionToken, userId: user.id, expires } });

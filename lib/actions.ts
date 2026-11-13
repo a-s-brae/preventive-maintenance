@@ -7,9 +7,10 @@ import { requirePermission, requireUser } from "@/auth";
 import { db } from "@/lib/db";
 import { isAllowedEmail } from "@/lib/email-domains";
 import { hashPassword, verifyPassword } from "@/lib/passwords";
+import { emailKey } from "@/lib/sign-in-limits";
+import { appUrl } from "@/lib/app-url";
 import { checklistFromForm, draftAnswers, findProblems, NOTE_MAX, parseAnswer, parseChecklist, resultsFromForm, type ChecklistResult } from "@/lib/checklist";
 import { endDowntime, startDowntime } from "@/lib/downtime";
-import { headers } from "next/headers";
 import { sendDigests } from "@/lib/digest";
 import { minutesBetween, runningKey } from "@/lib/labor";
 import { adjustStock, StockError } from "@/lib/parts";
@@ -767,6 +768,9 @@ export async function setPersonPassword(userId: string, _prev: FormState, fd: Fo
   const hash = await hashPassword(password);
   await db.password.upsert({ where: { userId }, create: { userId, hash }, update: { hash } });
   if (userId !== me.id) await db.session.deleteMany({ where: { userId } });
+  // A new password also lifts any wait from wrong guesses.
+  const person = await db.user.findUniqueOrThrow({ where: { id: userId }, select: { email: true } });
+  await db.signInFailure.deleteMany({ where: { key: emailKey(person.email) } });
   revalidatePath("/people");
   redirect("/people?passwordSet=1");
 }
@@ -806,9 +810,7 @@ export async function setGuideHidden(hidden: boolean) {
 /** Send everyone's daily email now (normally it goes out each weekday morning). */
 export async function sendDigestNow() {
   await requirePermission("people");
-  const h = await headers();
-  const base = process.env.APP_URL ?? `${h.get("x-forwarded-proto") ?? "http"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
-  const r = await sendDigests(base);
+  const r = await sendDigests(await appUrl());
   const qs = new URLSearchParams({ sent: String(r.sent), skipped: String(r.skipped), ...(r.errors.length && { error: r.errors[0] }) });
   redirect(`/people?${qs}`);
 }

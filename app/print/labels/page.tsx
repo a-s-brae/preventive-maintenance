@@ -1,5 +1,5 @@
-import { headers } from "next/headers";
 import QRCode from "qrcode";
+import { appUrl } from "@/lib/app-url";
 import { requirePermission } from "@/auth";
 import { db } from "@/lib/db";
 import { getLocationTree } from "@/lib/queries";
@@ -8,13 +8,6 @@ import { PrintButton } from "@/components/print-button";
 import { ORG_NAME } from "../print-parts";
 
 export const dynamic = "force-dynamic";
-
-/** The address phones will open: APP_URL when set, else the one this page was opened on. */
-async function baseUrl(): Promise<string> {
-  if (process.env.APP_URL) return process.env.APP_URL.replace(/\/+$/, "");
-  const h = await headers();
-  return `${h.get("x-forwarded-proto") ?? "http"}://${h.get("x-forwarded-host") ?? h.get("host")}`;
-}
 
 /** QR labels for equipment, 2" × 4" (Avery 5163 / 8163 size), ten to a letter sheet.
  *  ?asset=<id> (repeatable) for chosen assets, ?location=<id> for everything in a
@@ -32,7 +25,7 @@ export default async function LabelsPage({ searchParams }: { searchParams: Promi
       : { status: { not: "RETIRED" as const } };
   const assets = await db.asset.findMany({ where, orderBy: [{ assetTag: "asc" }, { name: "asc" }], select: { id: true, name: true, assetTag: true, locationId: true } });
 
-  const base = await baseUrl();
+  const base = await appUrl();
   const host = new URL(base).hostname;
   const unreachable = host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "[::1]";
   const labels = await Promise.all(

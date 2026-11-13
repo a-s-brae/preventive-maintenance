@@ -18,6 +18,10 @@ const blankToUndef = (v: unknown) => (typeof v === "string" && v.trim() === "" ?
 export const optText = z.preprocess(blankToUndef, z.string().trim().max(2000).optional());
 export const reqText = z.string().trim().min(1, "Required").max(200);
 export const optNumber = z.preprocess(blankToUndef, z.coerce.number().nonnegative().optional());
+/** A meter reading. Readings can't go back down, so a typo with extra digits
+ *  would stick: cap it well above any real hour or cycle count. */
+export const METER_MAX = 10_000_000;
+export const optMeter = z.preprocess(blankToUndef, z.coerce.number().nonnegative().max(METER_MAX, "That reading is too large — check the number").optional());
 export const optInt = z.preprocess(blankToUndef, z.coerce.number().int().positive().optional());
 
 /** Date-only input ("YYYY-MM-DD"), stored at 12:00 UTC so it shows as the same
@@ -73,7 +77,7 @@ export const taskSchema = z
     usageEvery: z.preprocess(blankToUndef, z.coerce.number().positive().optional()),
     scheduleBasis: z.enum(["COMPLETION", "FIXED"]).default("COMPLETION"),
     startDate: dateOnly,
-    startMeter: optNumber,
+    startMeter: optMeter,
     dueSoonDays: z.coerce.number().int().min(0).max(365).default(7),
     estimatedMinutes: optInt,
     priority,
@@ -133,7 +137,7 @@ export const downSchema = z.object({ reason: optText });
 
 export const completeSchema = z.object({
   performedAt: dateOnly,
-  meterReading: optNumber,
+  meterReading: optMeter,
   notes: optText,
   assetUp: z.preprocess((v) => v === "on", z.boolean()),
 });

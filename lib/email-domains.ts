@@ -7,6 +7,7 @@ const allowedDomains = (process.env.ALLOWED_EMAIL_DOMAINS ?? "as-plastech.com")
   .filter(Boolean);
 
 export function isAllowedEmail(email: string | null | undefined): boolean {
-  const domain = email?.toLowerCase().split("@")[1];
+  // Exactly one "@": "you@as-plastech.com@evil.com" must not pass as company mail.
+  const domain = email?.toLowerCase().match(/^[^@\s]+@([^@\s]+)$/)?.[1];
   return !!domain && allowedDomains.includes(domain);
 }

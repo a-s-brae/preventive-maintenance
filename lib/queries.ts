@@ -131,7 +131,11 @@ export async function getRailData(userId: string): Promise<RailData> {
 }
 
 /** All locations as a tree (depth-first, with each one's path). */
-export const getLocationTree = cache(async () => flattenTree(await db.location.findMany({ orderBy: { name: "asc" } })));
+// Names only: requesters get this list, and a location's notes (door codes,
+// access instructions) are for maintenance.
+export const getLocationTree = cache(async () =>
+  flattenTree(await db.location.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, parentId: true } })),
+);
 
 /** Assets as a tree, for pickers. Retired assets are left out unless asked for. */
 export const getAssetTree = cache(async (includeRetired: boolean = false) =>
@@ -173,8 +177,11 @@ export async function getChecklistTemplates() {
   return rows.map((t) => ({ id: t.id, name: t.name, items: parseChecklist(t.items) }));
 }
 
+/** People who can be given work: active admins and technicians. */
+export const ASSIGNABLE = { active: true, role: { in: ["ADMIN", "TECH"] } } satisfies Prisma.UserWhereInput;
+
 export function getUsers() {
-  return db.user.findMany({ orderBy: [{ name: "asc" }, { email: "asc" }], select: { id: true, name: true, email: true } });
+  return db.user.findMany({ where: ASSIGNABLE, orderBy: [{ name: "asc" }, { email: "asc" }], select: { id: true, name: true, email: true } });
 }
 
 export type UserOption = Awaited<ReturnType<typeof getUsers>>[number];

@@ -3,7 +3,8 @@ export function toCsv(header: string[], rows: (string | number | null | undefine
   const cell = (v: string | number | null | undefined) => {
     let s = v == null ? "" : String(v);
     // Stop spreadsheet apps from running a text cell as a formula.
-    if (typeof v === "string" && /^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+    // Leading spaces don't stop some of them, so look past those too.
+    if (typeof v === "string" && /^[\s]*[=+\-@]|^[\t\r]/.test(s)) s = `'${s}`;
     return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
   return "﻿" + [header, ...rows].map((r) => r.map(cell).join(",")).join("\r\n") + "\r\n";

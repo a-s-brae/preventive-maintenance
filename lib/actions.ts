@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, Role } from "@prisma/client";
 import { requirePermission, requireUser } from "@/auth";
 import { db } from "@/lib/db";
 import { isAllowedEmail } from "@/lib/email-domains";
@@ -27,7 +27,7 @@ import {
   downSchema,
   firstError,
   locationSchema,
-  optNumber,
+  optMeter,
   passwordProblem,
   rejectSchema,
   requestSchema,
@@ -39,6 +39,7 @@ import {
 import { MAX_IMPORT_BYTES, missingLocations, parseCsv, planAssetImport, planPartImport, summarizePlan } from "@/lib/csv-import";
 import { runAssetImport, runPartImport } from "@/lib/import-run";
 import { adminIds, notify } from "@/lib/notify";
+import { ASSIGNABLE } from "@/lib/queries";
 import { loadSampleData } from "@/lib/sample-data";
 import { nextFixedCycle } from "@/lib/schedule";
 import { wouldCycle } from "@/lib/tree";
@@ -49,6 +50,24 @@ const fields = (fd: FormData) => Object.fromEntries(fd.entries());
 
 function isUniqueViolation(e: unknown): boolean {
   return typeof e === "object" && e !== null && "code" in e && (e as { code: string }).code === "P2002";
+}
+
+class FormError extends Error {}
+
+/** Work can only be given to active admins and technicians. */
+async function checkAssignee(tx: Tx | typeof db, userId: string | null | undefined) {
+  if (userId && !(await tx.user.count({ where: { id: userId, ...ASSIGNABLE } }))) {
+    throw new FormError("That person can't be given work: pick an active admin or technician");
+  }
+}
+
+/** Time and parts on a finished work order are its record: only admins may
+ *  correct them. Locks the work order so it can't be completed meanwhile. */
+async function lockForEditing(tx: Tx, workOrderId: string, user: { role: Role }) {
+  await tx.$queryRaw`SELECT id FROM "WorkOrder" WHERE id = ${workOrderId} FOR UPDATE`;
+  const wo = await tx.workOrder.findUniqueOrThrow({ where: { id: workOrderId } });
+  if (wo.status === "COMPLETE" && !can(user.role, "manage")) throw new FormError("This work order is complete; ask an admin to correct it");
+  return wo;
 }
 
 // ─── Assets ─────────────────────────────────────────────────────────────────
@@ -117,8 +136,9 @@ class MeterError extends Error {}
 
 export async function recordMeter(assetId: string, _prev: FormState, fd: FormData): Promise<FormState> {
   const user = await requirePermission("work");
-  const value = optNumber.safeParse(fd.get("value"));
-  if (!value.success || value.data == null) return { error: "Enter a meter reading" };
+  const value = optMeter.safeParse(fd.get("value"));
+  if (!value.success) return { error: firstError(value.error) };
+  if (value.data == null) return { error: "Enter a meter reading" };
   try {
     await db.$transaction((tx) => applyMeterReading(tx, assetId, value.data!, user.id, new Date()));
   } catch (e) {
@@ -164,6 +184,12 @@ export async function saveTask(
     active: t.active,
   };
 
+  try {
+    await checkAssignee(db, data.defaultAssigneeId);
+  } catch (e) {
+    if (e instanceof FormError) return { error: e.message };
+    throw e;
+  }
   await db.$transaction(async (tx) => {
     const existing = ids.taskId ? await tx.pmTask.findUniqueOrThrow({ where: { id: ids.taskId } }) : null;
     // Fixed schedules: point at the first occurrence after the last time it
@@ -213,6 +239,13 @@ export async function saveWorkOrder(workOrderId: string | null, _prev: FormState
     dueDate: w.dueDate ?? null,
     assignedToId: w.assignedToId ?? null,
   };
+
+  try {
+    await checkAssignee(db, data.assignedToId);
+  } catch (e) {
+    if (e instanceof FormError) return { error: e.message };
+    throw e;
+  }
 
   let id: string;
   if (workOrderId) {
@@ -310,6 +343,8 @@ export async function completeWorkOrder(workOrderId: string, _prev: FormState, f
 
   try {
     await db.$transaction(async (tx) => {
+      // Lock the row: two people pressing Complete at once must not both reset the PM.
+      await tx.$queryRaw`SELECT id FROM "WorkOrder" WHERE id = ${workOrderId} FOR UPDATE`;
       const wo = await tx.workOrder.findUniqueOrThrow({ where: { id: workOrderId } });
       if (wo.status === "COMPLETE") throw new FormError("This work order is already complete");
       // Back up now if done today; a back-dated completion ends the downtime on that day.
@@ -382,8 +417,6 @@ export async function completeWorkOrder(workOrderId: string, _prev: FormState, f
   revalidatePath("/", "layout");
   redirect(`/work-orders/${workOrderId}`);
 }
-
-class FormError extends Error {}
 
 /** Only hand-made work orders can be deleted; PM ones come back while the PM is due. */
 export async function deleteWorkOrder(workOrderId: string) {
@@ -497,6 +530,7 @@ export async function approveRequest(requestId: string, _prev: FormState, fd: Fo
       await tx.$queryRaw`SELECT id FROM "Request" WHERE id = ${requestId} FOR UPDATE`;
       const req = await tx.request.findUniqueOrThrow({ where: { id: requestId }, include: { requestedBy: true } });
       if (req.status !== "PENDING") throw new FormError("This request has already been reviewed");
+      await checkAssignee(tx, a.assignedToId);
       const by = req.requestedBy ? (req.requestedBy.name ?? req.requestedBy.email) : "someone";
       const wo = await tx.workOrder.create({
         data: {
@@ -627,21 +661,26 @@ export async function usePart(workOrderId: string, _prev: FormState, fd: FormDat
   const { partId, quantity } = parsed.data;
   try {
     await db.$transaction(async (tx) => {
+      await lockForEditing(tx, workOrderId, user);
       const part = await adjustStock(tx, { partId, reason: "USED", change: -quantity, workOrderId, userId: user.id });
       await tx.partUsage.create({ data: { workOrderId, partId, quantity, unitCost: part.unitCost, usedById: user.id } });
     });
   } catch (e) {
-    if (e instanceof StockError) return { error: e.message };
+    if (e instanceof StockError || e instanceof FormError) return { error: e.message };
     throw e;
   }
   revalidatePath("/", "layout");
   return {};
 }
 
-/** Take a part line off a work order and put the parts back in stock. */
+/** Take a part line off a work order and put the parts back in stock. Like
+ *  time entries: your own lines, or anyone's if you're an admin. */
 export async function removePartUsage(usageId: string) {
   const user = await requirePermission("work");
   await db.$transaction(async (tx) => {
+    const found = await tx.partUsage.findUniqueOrThrow({ where: { id: usageId } });
+    if (found.usedById !== user.id && !can(user.role, "manage")) return;
+    await lockForEditing(tx, found.workOrderId, user);
     const usage = await tx.partUsage.delete({ where: { id: usageId } });
     await adjustStock(tx, { partId: usage.partId, reason: "RETURNED", change: usage.quantity, workOrderId: usage.workOrderId, userId: user.id });
   });
@@ -683,9 +722,17 @@ export async function addLabor(workOrderId: string, _prev: FormState, fd: FormDa
   const parsed = laborSchema.safeParse(fields(fd));
   if (!parsed.success) return { error: firstError(parsed.error) };
   const { date, total, note } = parsed.data;
-  await db.laborEntry.create({
-    data: { workOrderId, userId: user.id, startedAt: date, endedAt: new Date(date.getTime() + total * 60_000), minutes: total, note: note ?? null },
-  });
+  try {
+    await db.$transaction(async (tx) => {
+      await lockForEditing(tx, workOrderId, user);
+      await tx.laborEntry.create({
+        data: { workOrderId, userId: user.id, startedAt: date, endedAt: new Date(date.getTime() + total * 60_000), minutes: total, note: note ?? null },
+      });
+    });
+  } catch (e) {
+    if (e instanceof FormError) return { error: e.message };
+    throw e;
+  }
   revalidatePath("/", "layout");
   return {};
 }
@@ -695,6 +742,8 @@ export async function deleteLabor(entryId: string) {
   const user = await requirePermission("work");
   const entry = await db.laborEntry.findUniqueOrThrow({ where: { id: entryId } });
   if (entry.userId !== user.id && !can(user.role, "manage")) return;
+  const wo = await db.workOrder.findUniqueOrThrow({ where: { id: entry.workOrderId } });
+  if (wo.status === "COMPLETE" && !can(user.role, "manage")) return;
   await db.laborEntry.delete({ where: { id: entryId } });
   revalidatePath("/", "layout");
 }
@@ -721,12 +770,17 @@ export async function updatePerson(userId: string, _prev: FormState, fd: FormDat
   const name = String(fd.get("name") ?? "").trim().slice(0, 100) || null;
 
   const losingAdmin = role !== "ADMIN" || !active;
-  if (losingAdmin) {
-    const target = await db.user.findUniqueOrThrow({ where: { id: userId } });
-    const admins = await db.user.count({ where: { role: "ADMIN", active: true } });
-    if (target.role === "ADMIN" && target.active && admins <= 1) return { error: "There has to be at least one active admin" };
-  }
-  await db.user.update({ where: { id: userId }, data: { role, active, emailDigest, name } });
+  const ok = await db.$transaction(async (tx) => {
+    if (losingAdmin) {
+      // Lock the admins' rows so two admins demoting each other at once can't
+      // both pass the check and leave nobody in charge.
+      const admins = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM "User" WHERE role = 'ADMIN' AND active FOR UPDATE`;
+      if (admins.length <= 1 && admins.some((a) => a.id === userId)) return false;
+    }
+    await tx.user.update({ where: { id: userId }, data: { role, active, emailDigest, name } });
+    return true;
+  });
+  if (!ok) return { error: "There has to be at least one active admin" };
   // Deactivating signs them out everywhere.
   if (!active) await db.session.deleteMany({ where: { userId } });
   revalidatePath("/", "layout");
